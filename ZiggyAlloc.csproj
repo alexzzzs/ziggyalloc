@@ -37,6 +37,7 @@
     <PackageReleaseNotes>See CHANGELOG.md for detailed release notes.</PackageReleaseNotes>
   </PropertyGroup>
 
+  <LangVersion>preview</LangVersion>
   <ItemGroup>
     <Compile Remove="tests/**" />
     <Compile Remove="examples/**" />
