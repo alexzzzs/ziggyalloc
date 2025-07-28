@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>ZiggyAlloc</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>ZiggyAlloc Contributors</Authors>
+    <Company>ZiggyAlloc</Company>
+    <Product>ZiggyAlloc</Product>
+    <Title>ZiggyAlloc - Zig-inspired Memory Management for C#</Title>
+    <Description>A C# library inspired by Zig's memory and context management, providing explicit memory control, multiple allocator types, and Zig-style patterns for .NET applications.</Description>
+    <PackageTags>memory;allocation;zig;unmanaged;allocator;context;defer;raii</PackageTags>
+    <PackageProjectUrl>https://github.com/ziggyalloc/ziggyalloc</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ziggyalloc/ziggyalloc</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests/**" />
+    <Compile Remove="examples/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+# Configuration for auto-assign action
+# Automatically assigns reviewers to pull requests
+
+# Reviewers to assign (add GitHub usernames of maintainers)
+reviewers:
+  - # Add maintainer usernames here when you have them
+
+# Number of reviewers to assign
+numberOfReviewers: 1
+
+# Skip if PR is in draft
+skipDraftPR: true

@@ -1,0 +1,17 @@
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\bin\Debug\net8.0\TestConsumerNet8.exe
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\bin\Debug\net8.0\TestConsumerNet8.deps.json
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\bin\Debug\net8.0\TestConsumerNet8.runtimeconfig.json
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\bin\Debug\net8.0\TestConsumerNet8.dll
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\bin\Debug\net8.0\TestConsumerNet8.pdb
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\bin\Debug\net8.0\ZiggyAlloc.dll
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.csproj.AssemblyReference.cache
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.AssemblyInfoInputs.cache
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.AssemblyInfo.cs
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.csproj.CoreCompileInputs.cache
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestCons.6BCB9E2B.Up2Date
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.dll
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\refint\TestConsumerNet8.dll
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.pdb
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\TestConsumerNet8.genruntimeconfig.cache
+C:\Users\annab\Desktop\ZiggyAlloc\TestConsumerNet8\obj\Debug\net8.0\ref\TestConsumerNet8.dll

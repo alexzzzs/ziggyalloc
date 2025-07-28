@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>ZiggyAlloc</id>
+    <version>1.0.0</version>
+    <authors>ZiggyAlloc Contributors</authors>
+    <description>A C# library inspired by Zig's memory and context management</description>
+    <tags>memory allocation zig unmanaged</tags>
+    <repository type="git" />
+    <dependencies>
+      <group targetFramework="net8.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="C:\Users\annab\Desktop\ZiggyAlloc\bin\Debug\net8.0\ZiggyAlloc.dll" target="lib\net8.0\ZiggyAlloc.dll" />
+  </files>
+</package>

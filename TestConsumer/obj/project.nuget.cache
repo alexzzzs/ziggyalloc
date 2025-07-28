@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "Yiz8cvUYuD4=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\annab\\Desktop\\ZiggyAlloc\\TestConsumer\\TestConsumer.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\annab\\.nuget\\packages\\ziggyalloc\\1.0.0\\ziggyalloc.1.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
