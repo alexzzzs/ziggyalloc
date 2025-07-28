@@ -370,3 +370,8 @@ FreshUserTest/
 
 # Local project files (not for public repo)
 PROJECT_SUMMARY.md
+
+# Release artifacts
+release-artifacts/
+*.nupkg
+*.snupkg

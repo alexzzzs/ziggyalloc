@@ -140,10 +140,31 @@ We follow [Semantic Versioning](https://semver.org/):
 - Patch: Bug fixes (backward compatible)
 
 ### Release Workflow
-1. Update version in `ZiggyAlloc.csproj`
-2. Update `CHANGELOG.md`
-3. Create GitHub release with tag
-4. CI automatically publishes to NuGet.org
+
+#### For Maintainers
+1. **Prepare Release**:
+   ```powershell
+   .\scripts\prepare-release.ps1 -Version "1.1.0"
+   ```
+
+2. **Update CHANGELOG.md** with detailed changes
+
+3. **Commit and Tag**:
+   ```bash
+   git add .
+   git commit -m "Bump version to 1.1.0"
+   git tag v1.1.0
+   git push origin main --tags
+   ```
+
+4. **Create GitHub Release**:
+   - Use the template in `.github/RELEASE_TEMPLATE.md`
+   - GitHub Actions will automatically publish to NuGet
+
+#### For Contributors
+- Focus on feature development and bug fixes
+- Maintainers handle the release process
+- See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow
 
 ## 🤝 Code of Conduct
 

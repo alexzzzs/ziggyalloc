@@ -38,7 +38,7 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && github.event.action == 'published'
     
     steps:
     - uses: actions/checkout@v4
@@ -48,17 +48,30 @@ jobs:
       with:
         dotnet-version: '8.0.x'
         
+    - name: Extract version from tag
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        
     - name: Restore dependencies
       run: dotnet restore
       
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build --no-restore --configuration Release -p:Version=${{ steps.version.outputs.VERSION }}
+      
+    - name: Test
+      run: dotnet test --no-build --configuration Release --verbosity normal
       
     - name: Pack
-      run: dotnet pack --no-build --configuration Release --output ./artifacts
+      run: dotnet pack --no-build --configuration Release --output ./artifacts -p:Version=${{ steps.version.outputs.VERSION }}
       
     - name: Publish to NuGet
       run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-packages
+        path: ./artifacts/*.nupkg
 
   # Auto-assign reviewers for PRs
   assign-reviewers:
