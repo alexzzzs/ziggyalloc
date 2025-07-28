@@ -14,8 +14,8 @@
     <Title>ZiggyAlloc - Zig-inspired Memory Management for C#</Title>
     <Description>A C# library inspired by Zig's memory and context management, providing explicit memory control, multiple allocator types, and Zig-style patterns for .NET applications.</Description>
     <PackageTags>memory;allocation;zig;unmanaged;allocator;context;defer;raii</PackageTags>
-    <PackageProjectUrl>https://github.com/ziggyalloc/ziggyalloc</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/ziggyalloc/ziggyalloc</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/alexzzzs/ziggyalloc</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/alexzzzs/ziggyalloc</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
