@@ -367,3 +367,6 @@ nupkg/
 # Test consumer projects (temporary)
 TestConsumer*/
 FreshUserTest/
+
+# Local project files (not for public repo)
+PROJECT_SUMMARY.md
