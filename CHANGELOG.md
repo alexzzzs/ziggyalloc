@@ -19,6 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - 
 
+## [1.0.2] - 2025-01-30
+
+### Added
+- **DeferScope** - Zig-style defer pattern for automatic cleanup in reverse order
+- **Extension methods** - `AllocateDeferred<T>()` for seamless buffer allocation with deferred disposal
+- **Exception-safe cleanup** - Deferred actions execute even if exceptions occur during disposal
+- **Comprehensive defer examples** - 5 different patterns including nested scopes and error handling
+- **4 new tests** for defer functionality covering all usage scenarios
+
+### Changed
+- **Examples enhanced** - Added defer patterns to BasicUsage and AdvancedUsage demonstrations
+- **Documentation updated** - README.md and DOCUMENTATION.md now include defer API reference and examples
+- **Test coverage increased** - Now 36 tests total, all passing
+
+### Fixed
+- **Memory management** - Defer ensures proper cleanup order even in complex scenarios
+
 ## [1.0.1] - 2025-01-30
 
 ### Added
