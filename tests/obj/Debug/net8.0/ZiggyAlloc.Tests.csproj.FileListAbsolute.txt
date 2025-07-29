@@ -1,6 +1,0 @@
-C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Debug\net8.0\ZiggyAlloc.Tests.csproj.AssemblyReference.cache
-C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Debug\net8.0\ZiggyAlloc.Tests.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Debug\net8.0\ZiggyAlloc.Tests.AssemblyInfoInputs.cache
-C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Debug\net8.0\ZiggyAlloc.Tests.AssemblyInfo.cs
-C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Debug\net8.0\ZiggyAlloc.Tests.csproj.CoreCompileInputs.cache
-C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Debug\net8.0\ZiggyAlloc.Tests.sourcelink.json

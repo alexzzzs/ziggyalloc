@@ -9,7 +9,7 @@
       "ZiggyAlloc.Tests/1.0.0": {
         "dependencies": {
           "Microsoft.NET.Test.Sdk": "17.8.0",
-          "ZiggyAlloc": "1.0.0",
+          "ZiggyAlloc": "1.0.1",
           "xunit": "2.6.1",
           "xunit.runner.visualstudio": "2.5.3"
         },
@@ -1016,11 +1016,11 @@
         }
       },
       "xunit.runner.visualstudio/2.5.3": {},
-      "ZiggyAlloc/1.0.0": {
+      "ZiggyAlloc/1.0.1": {
         "runtime": {
           "ZiggyAlloc.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
+            "assemblyVersion": "1.0.1.0",
+            "fileVersion": "1.0.1.0"
           }
         }
       }
@@ -1648,7 +1648,7 @@
       "path": "xunit.runner.visualstudio/2.5.3",
       "hashPath": "xunit.runner.visualstudio.2.5.3.nupkg.sha512"
     },
-    "ZiggyAlloc/1.0.0": {
+    "ZiggyAlloc/1.0.1": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

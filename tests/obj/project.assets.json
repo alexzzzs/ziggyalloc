@@ -1700,7 +1700,7 @@
           "build/net6.0/xunit.runner.visualstudio.props": {}
         }
       },
-      "ZiggyAlloc/1.0.0": {
+      "ZiggyAlloc/1.0.1": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "compile": {
@@ -5448,7 +5448,7 @@
         "xunit.runner.visualstudio.nuspec"
       ]
     },
-    "ZiggyAlloc/1.0.0": {
+    "ZiggyAlloc/1.0.1": {
       "type": "project",
       "path": "../ZiggyAlloc.csproj",
       "msbuildProject": "../ZiggyAlloc.csproj"
@@ -5457,7 +5457,7 @@
   "projectFileDependencyGroups": {
     "net8.0": [
       "Microsoft.NET.Test.Sdk >= 17.8.0",
-      "ZiggyAlloc >= 1.0.0",
+      "ZiggyAlloc >= 1.0.1",
       "xunit >= 2.6.1",
       "xunit.runner.visualstudio >= 2.5.3"
     ]
