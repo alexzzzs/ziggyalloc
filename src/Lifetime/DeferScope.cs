@@ -4,51 +4,79 @@ using System.Collections.Generic;
 namespace ZiggyAlloc
 {
     /// <summary>
-    /// Manages deferred cleanup actions that are executed in reverse order when the scope is disposed.
+    /// Implements Zig's defer pattern for automatic cleanup in reverse order.
     /// </summary>
     /// <remarks>
-    /// This class implements Zig's defer pattern, where cleanup actions are registered during execution
-    /// and automatically run in LIFO (Last In, First Out) order when the scope ends. This ensures
-    /// that resources are cleaned up in the reverse order of their acquisition, which is typically
-    /// the safest approach for nested resource management.
+    /// DeferScope allows you to register cleanup actions that are executed in LIFO order
+    /// when the scope is disposed. This is particularly useful for resource management
+    /// where you want to ensure cleanup happens in the reverse order of acquisition.
     /// 
-    /// The deferred actions are executed even if exceptions occur, making this suitable for
-    /// deterministic resource cleanup in both success and error scenarios.
+    /// Example usage:
+    /// <code>
+    /// using var defer = DeferScope.Start();
+    /// 
+    /// var buffer1 = allocator.Allocate&lt;int&gt;(100);
+    /// defer.Defer(() => buffer1.Dispose());
+    /// 
+    /// var buffer2 = allocator.Allocate&lt;double&gt;(50);
+    /// defer.Defer(() => buffer2.Dispose());
+    /// 
+    /// // Cleanup happens in reverse order: buffer2, then buffer1
+    /// </code>
     /// </remarks>
-    public sealed class DeferredCleanupScope : IDisposable
+    public sealed class DeferScope : IDisposable
     {
         private readonly Stack<Action> _deferredActions = new();
         private bool _disposed = false;
 
         /// <summary>
+        /// Starts a new defer scope.
+        /// </summary>
+        /// <returns>A new DeferScope instance</returns>
+        /// <remarks>
+        /// Use this with a 'using' statement to ensure proper cleanup:
+        /// <code>using var defer = DeferScope.Start();</code>
+        /// </remarks>
+        public static DeferScope Start() => new();
+
+        /// <summary>
         /// Registers an action to be executed when the scope is disposed.
         /// </summary>
-        /// <param name="cleanupAction">The action to execute during cleanup</param>
-        /// <exception cref="ArgumentNullException">Thrown when cleanupAction is null</exception>
-        /// <exception cref="ObjectDisposedException">Thrown when the scope has already been disposed</exception>
+        /// <param name="action">The cleanup action to defer</param>
+        /// <exception cref="ArgumentNullException">Thrown when action is null</exception>
+        /// <exception cref="ObjectDisposedException">Thrown when the scope has been disposed</exception>
         /// <remarks>
-        /// Actions are executed in reverse order of registration (LIFO - Last In, First Out).
-        /// This ensures that resources are cleaned up in the reverse order of their acquisition.
+        /// Actions are executed in reverse order (LIFO) during disposal.
+        /// This ensures resources are cleaned up in the reverse order of acquisition.
         /// </remarks>
-        public void DeferAction(Action cleanupAction)
+        public void Defer(Action action)
         {
-            if (cleanupAction == null)
-                throw new ArgumentNullException(nameof(cleanupAction));
+            if (action == null)
+                throw new ArgumentNullException(nameof(action));
             
             ThrowIfDisposed();
-            
-            _deferredActions.Push(cleanupAction);
+            _deferredActions.Push(action);
+        }
+
+        /// <summary>
+        /// Gets the number of deferred actions currently registered.
+        /// </summary>
+        public int Count
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _deferredActions.Count;
+            }
         }
 
         /// <summary>
         /// Executes all deferred actions in reverse order and disposes the scope.
         /// </summary>
         /// <remarks>
-        /// Actions are executed in LIFO order (Last In, First Out). If any action throws an exception,
-        /// the remaining actions will still be executed, but the first exception will be re-thrown
-        /// after all cleanup attempts are complete.
-        /// 
-        /// After disposal, no new actions can be deferred and the scope cannot be reused.
+        /// Actions are executed in LIFO order. If any action throws an exception,
+        /// remaining actions will still be executed, but the first exception will
+        /// be re-thrown after all cleanup attempts complete.
         /// </remarks>
         public void Dispose()
         {
@@ -66,49 +94,64 @@ namespace ZiggyAlloc
                 }
                 catch (Exception ex)
                 {
-                    // Store the first exception but continue cleanup
+                    // Store first exception but continue cleanup
                     firstException ??= ex;
                 }
             }
 
             _disposed = true;
 
-            // Re-throw the first exception if any occurred during cleanup
+            // Re-throw first exception if any occurred
             if (firstException != null)
                 throw firstException;
         }
 
-        /// <summary>
-        /// Creates and returns a new deferred cleanup scope.
-        /// </summary>
-        /// <returns>A new DeferredCleanupScope instance ready for use</returns>
-        /// <remarks>
-        /// This is a convenience method equivalent to calling 'new DeferredCleanupScope()'.
-        /// The returned scope should be used with a 'using' statement to ensure proper disposal.
-        /// </remarks>
-        public static DeferredCleanupScope Create() => new();
-
-        /// <summary>
-        /// Gets the number of deferred actions currently registered.
-        /// </summary>
-        /// <returns>The number of actions that will be executed during disposal</returns>
-        /// <exception cref="ObjectDisposedException">Thrown when the scope has been disposed</exception>
-        public int DeferredActionCount
-        {
-            get
-            {
-                ThrowIfDisposed();
-                return _deferredActions.Count;
-            }
-        }
-
-        /// <summary>
-        /// Throws ObjectDisposedException if the scope has been disposed.
-        /// </summary>
         private void ThrowIfDisposed()
         {
             if (_disposed)
-                throw new ObjectDisposedException(nameof(DeferredCleanupScope));
+                throw new ObjectDisposedException(nameof(DeferScope));
+        }
+    }
+
+    /// <summary>
+    /// Extension methods to make defer usage more convenient with allocators.
+    /// </summary>
+    public static class DeferExtensions
+    {
+        /// <summary>
+        /// Allocates a buffer and automatically defers its disposal.
+        /// </summary>
+        /// <typeparam name="T">The unmanaged type to allocate</typeparam>
+        /// <param name="allocator">The allocator to use</param>
+        /// <param name="defer">The defer scope to register cleanup with</param>
+        /// <param name="elementCount">Number of elements to allocate</param>
+        /// <param name="zeroMemory">Whether to zero-initialize the memory</param>
+        /// <returns>The allocated buffer (disposal is automatically deferred)</returns>
+        public static UnmanagedBuffer<T> AllocateDeferred<T>(
+            this IUnmanagedMemoryAllocator allocator,
+            DeferScope defer,
+            int elementCount,
+            bool zeroMemory = false) where T : unmanaged
+        {
+            var buffer = allocator.Allocate<T>(elementCount, zeroMemory);
+            defer.Defer(() => buffer.Dispose());
+            return buffer;
+        }
+
+        /// <summary>
+        /// Allocates a single element buffer and automatically defers its disposal.
+        /// </summary>
+        /// <typeparam name="T">The unmanaged type to allocate</typeparam>
+        /// <param name="allocator">The allocator to use</param>
+        /// <param name="defer">The defer scope to register cleanup with</param>
+        /// <param name="zeroMemory">Whether to zero-initialize the memory</param>
+        /// <returns>The allocated buffer (disposal is automatically deferred)</returns>
+        public static UnmanagedBuffer<T> AllocateDeferred<T>(
+            this IUnmanagedMemoryAllocator allocator,
+            DeferScope defer,
+            bool zeroMemory = false) where T : unmanaged
+        {
+            return allocator.AllocateDeferred<T>(defer, 1, zeroMemory);
         }
     }
 }

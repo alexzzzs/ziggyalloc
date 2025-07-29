@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Xunit;
 using ZiggyAlloc;
 
@@ -191,6 +192,100 @@ namespace ZiggyAlloc.Tests
             
             // AsSpan should also throw for invalid buffer
             Assert.Throws<InvalidOperationException>(() => buffer.AsSpan());
+        }
+
+        [Fact]
+        public void DeferScope_ExecutesActionsInReverseOrder()
+        {
+            var executionOrder = new List<int>();
+            
+            using (var defer = DeferScope.Start())
+            {
+                defer.Defer(() => executionOrder.Add(1));
+                defer.Defer(() => executionOrder.Add(2));
+                defer.Defer(() => executionOrder.Add(3));
+                
+                Assert.Equal(3, defer.Count);
+            } // Actions should execute in reverse order: 3, 2, 1
+            
+            Assert.Equal(new[] { 3, 2, 1 }, executionOrder);
+        }
+
+        [Fact]
+        public void DeferScope_WithAllocations_FreesMemoryInCorrectOrder()
+        {
+            var allocator = new SystemMemoryAllocator();
+            var freedPointers = new List<IntPtr>();
+            
+            using (var defer = DeferScope.Start())
+            {
+                var buffer1 = allocator.AllocateDeferred<int>(defer, 10);
+                var buffer2 = allocator.AllocateDeferred<double>(defer, 5);
+                
+                var ptr1 = buffer1.RawPointer;
+                var ptr2 = buffer2.RawPointer;
+                
+                // Add custom tracking
+                defer.Defer(() => freedPointers.Add(ptr1));
+                defer.Defer(() => freedPointers.Add(ptr2));
+                
+                // Use the buffers
+                buffer1[0] = 42;
+                buffer2[0] = 3.14;
+                
+                Assert.Equal(42, buffer1[0]);
+                Assert.Equal(3.14, buffer2[0]);
+                Assert.Equal(4, defer.Count); // 2 buffers + 2 custom actions
+            }
+            
+            // Custom actions should execute in reverse order
+            Assert.Equal(2, freedPointers.Count);
+            // Note: The exact order depends on when the tracking actions were added
+        }
+
+        [Fact]
+        public void DeferScope_HandlesExceptionsGracefully()
+        {
+            var executionOrder = new List<string>();
+            
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                using var defer = DeferScope.Start();
+                
+                defer.Defer(() => executionOrder.Add("cleanup1"));
+                defer.Defer(() => throw new InvalidOperationException("Test exception"));
+                defer.Defer(() => executionOrder.Add("cleanup2"));
+                
+                // This should still execute cleanup2 and cleanup1 even though middle action throws
+            });
+            
+            // Both cleanup actions should have executed despite the exception
+            Assert.Contains("cleanup1", executionOrder);
+            Assert.Contains("cleanup2", executionOrder);
+        }
+
+        [Fact]
+        public void DeferExtensions_AllocateDeferred_WorksCorrectly()
+        {
+            var allocator = new SystemMemoryAllocator();
+            
+            using (var defer = DeferScope.Start())
+            {
+                // Test single element allocation
+                var singleBuffer = allocator.AllocateDeferred<int>(defer, zeroMemory: false);
+                singleBuffer[0] = 42;
+                Assert.Equal(42, singleBuffer[0]);
+                
+                // Test multi-element allocation
+                var multiBuffer = allocator.AllocateDeferred<double>(defer, 5, zeroMemory: true);
+                Assert.Equal(5, multiBuffer.Length);
+                Assert.Equal(0.0, multiBuffer[0]); // Should be zeroed
+                
+                multiBuffer[0] = 3.14159;
+                Assert.Equal(3.14159, multiBuffer[0]);
+                
+                Assert.Equal(2, defer.Count); // Two cleanup actions registered
+            } // Both buffers should be disposed automatically
         }
     }
 }

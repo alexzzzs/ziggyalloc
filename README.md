@@ -48,6 +48,30 @@ data.Fill(3.14159f);
 ProcessDataNative(buffer.RawPointer, buffer.Length);
 ```
 
+### Zig-style Defer Pattern
+
+```csharp
+using ZiggyAlloc;
+
+var allocator = new SystemMemoryAllocator();
+
+// Defer scope ensures cleanup in reverse order
+using var defer = DeferScope.Start();
+
+var buffer1 = allocator.AllocateDeferred<int>(defer, 1000);
+var buffer2 = allocator.AllocateDeferred<float>(defer, 500);
+
+// Custom cleanup actions
+defer.Defer(() => Console.WriteLine("Cleanup complete!"));
+
+// Use buffers...
+buffer1[0] = 42;
+buffer2[0] = 3.14f;
+
+// Cleanup happens automatically in reverse order:
+// 1. Custom action, 2. buffer2, 3. buffer1
+```
+
 ## Real-World Examples
 
 ### 🔧 **Native API Interop**
@@ -133,6 +157,7 @@ buffer[0] = 42;
 
 - **Bounds checking**: Buffer access is bounds-checked
 - **Automatic disposal**: Buffers integrate with `using` statements
+- **Defer scopes**: Zig-style cleanup in reverse order with `DeferScope`
 - **Leak detection**: Debug allocator reports unfreed memory with caller info
 - **Type safety**: Generic allocations with compile-time type checking
 - **Span integration**: Seamless conversion to `Span<T>` for safe operations
@@ -146,6 +171,7 @@ buffer[0] = 42;
 - `SystemMemoryAllocator` - High-performance system allocator
 - `ScopedMemoryAllocator` - Arena-style allocator with automatic cleanup
 - `DebugMemoryAllocator` - Leak-detecting wrapper allocator
+- `DeferScope` - Zig-style defer pattern for reverse-order cleanup
 
 ### Allocator Interface
 

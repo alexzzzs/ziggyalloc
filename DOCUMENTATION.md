@@ -337,6 +337,42 @@ public static class Z
 }
 ```
 
+### DeferScope
+
+```csharp
+public sealed class DeferScope : IDisposable
+{
+    // Start a new defer scope
+    public static DeferScope Start();
+    
+    // Register cleanup action (executed in reverse order)
+    public void Defer(Action action);
+    
+    // Number of deferred actions
+    public int Count { get; }
+    
+    // Execute all deferred actions in reverse order
+    public void Dispose();
+}
+
+// Extension methods for convenient allocation with defer
+public static class DeferExtensions
+{
+    // Allocate buffer and automatically defer its disposal
+    public static UnmanagedBuffer<T> AllocateDeferred<T>(
+        this IUnmanagedMemoryAllocator allocator,
+        DeferScope defer,
+        int elementCount,
+        bool zeroMemory = false) where T : unmanaged;
+        
+    // Allocate single element buffer with deferred disposal
+    public static UnmanagedBuffer<T> AllocateDeferred<T>(
+        this IUnmanagedMemoryAllocator allocator,
+        DeferScope defer,
+        bool zeroMemory = false) where T : unmanaged;
+}
+```
+
 
 
 ## Best Practices

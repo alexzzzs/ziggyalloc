@@ -5,9 +5,15 @@ namespace ZiggyAlloc.Examples
 {
     public static class BasicUsage
     {
-        public static void Main()
+        public static void Main(string[] args)
         {
             Console.WriteLine("=== ZiggyAlloc: High-Performance Unmanaged Memory ===\n");
+            
+            if (args.Length > 0 && args[0] == "advanced")
+            {
+                AdvancedUsage.RunAdvancedExamples();
+                return;
+            }
             
             RunBasicExample();
             
@@ -54,6 +60,30 @@ namespace ZiggyAlloc.Examples
                 
                 Console.WriteLine($"  Filled with π, first value: {span[0]:F6}");
             }
+
+            // 3. Defer scope example - Zig-style cleanup
+            Console.WriteLine("\n✓ Defer scope example (Zig-style):");
+            using (var defer = DeferScope.Start())
+            {
+                // Allocate multiple buffers with deferred cleanup
+                var buffer1 = allocator.AllocateDeferred<int>(defer, 100);
+                var buffer2 = allocator.AllocateDeferred<float>(defer, 50);
+                var buffer3 = allocator.AllocateDeferred<byte>(defer, 1000);
+
+                // Fill with data
+                buffer1[0] = 42;
+                buffer2[0] = 3.14f;
+                buffer3[0] = 255;
+
+                Console.WriteLine($"  Allocated 3 buffers with defer scope");
+                Console.WriteLine($"  Values: {buffer1[0]}, {buffer2[0]:F2}, {buffer3[0]}");
+                Console.WriteLine($"  Defer count: {defer.Count} cleanup actions");
+                
+                // Custom cleanup action
+                defer.Defer(() => Console.WriteLine("  Custom cleanup executed!"));
+                
+                Console.WriteLine($"  All cleanup will happen in reverse order...");
+            } // Cleanup happens here: custom action, buffer3, buffer2, buffer1
 
             Console.WriteLine($"\n✓ All memory freed, allocator usage: {allocator.TotalAllocatedBytes} bytes");
         }

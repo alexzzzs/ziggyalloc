@@ -20,6 +20,9 @@ namespace ZiggyAlloc.Examples
             
             // Example 4: Interop scenarios
             DemonstrateInterop();
+            
+            // Example 5: Defer scope patterns
+            DemonstrateDeferPatterns();
         }
 
         static void DemonstrateAllocatorTypes()
@@ -144,6 +147,105 @@ namespace ZiggyAlloc.Examples
             // SimulateNativeApiCall(rawPtr, structArray.Length);
             
             Console.WriteLine("Memory will be automatically freed when buffer is disposed");
+        }
+
+        static void DemonstrateDeferPatterns()
+        {
+            Console.WriteLine("5. Defer Scope Patterns (Zig-style)");
+            Console.WriteLine("-----------------------------------");
+
+            var allocator = new SystemMemoryAllocator();
+
+            // Pattern 1: Simple defer with multiple resources
+            Console.WriteLine("Pattern 1: Multiple resource cleanup");
+            using (var defer = DeferScope.Start())
+            {
+                var buffer1 = allocator.AllocateDeferred<int>(defer, 10);
+                var buffer2 = allocator.AllocateDeferred<double>(defer, 20);
+                var buffer3 = allocator.AllocateDeferred<byte>(defer, 100);
+
+                // Use the buffers
+                buffer1[0] = 42;
+                buffer2[0] = 3.14159;
+                buffer3[0] = 0xFF;
+
+                Console.WriteLine($"  Allocated {defer.Count} buffers");
+                Console.WriteLine($"  Values: {buffer1[0]}, {buffer2[0]:F3}, {buffer3[0]:X2}");
+                
+                // Add custom cleanup
+                defer.Defer(() => Console.WriteLine("  ✓ Custom cleanup completed"));
+            } // All cleanup happens in reverse order
+
+            // Pattern 2: Nested defer scopes
+            Console.WriteLine("\nPattern 2: Nested defer scopes");
+            using (var outerDefer = DeferScope.Start())
+            {
+                var outerBuffer = allocator.AllocateDeferred<int>(outerDefer, 5);
+                outerDefer.Defer(() => Console.WriteLine("  ✓ Outer scope cleanup"));
+
+                using (var innerDefer = DeferScope.Start())
+                {
+                    var innerBuffer = allocator.AllocateDeferred<float>(innerDefer, 3);
+                    innerDefer.Defer(() => Console.WriteLine("  ✓ Inner scope cleanup"));
+                    
+                    outerBuffer[0] = 100;
+                    innerBuffer[0] = 2.5f;
+                    
+                    Console.WriteLine($"  Outer: {outerBuffer[0]}, Inner: {innerBuffer[0]}");
+                } // Inner cleanup happens first
+            } // Then outer cleanup
+
+            // Pattern 3: Error handling with defer
+            Console.WriteLine("\nPattern 3: Error handling with defer");
+            try
+            {
+                using var defer = DeferScope.Start();
+                
+                var buffer = allocator.AllocateDeferred<int>(defer, 10);
+                defer.Defer(() => Console.WriteLine("  ✓ Cleanup executed despite exception"));
+                
+                buffer[0] = 42;
+                Console.WriteLine($"  Buffer value: {buffer[0]}");
+                
+                // Simulate an error
+                throw new InvalidOperationException("Simulated error");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"  Caught exception: {ex.Message}");
+                Console.WriteLine("  (Notice cleanup still happened)");
+            }
+
+            // Pattern 4: Complex resource management
+            Console.WriteLine("\nPattern 4: Complex resource management");
+            using (var defer = DeferScope.Start())
+            {
+                // Simulate opening a file
+                defer.Defer(() => Console.WriteLine("  ✓ File closed"));
+                Console.WriteLine("  File opened");
+
+                // Allocate processing buffer
+                var processingBuffer = allocator.AllocateDeferred<byte>(defer, 1024);
+                Console.WriteLine("  Processing buffer allocated");
+
+                // Simulate network connection
+                defer.Defer(() => Console.WriteLine("  ✓ Network connection closed"));
+                Console.WriteLine("  Network connection opened");
+
+                // Allocate network buffer
+                var networkBuffer = allocator.AllocateDeferred<byte>(defer, 2048);
+                Console.WriteLine("  Network buffer allocated");
+
+                // Use the resources
+                processingBuffer[0] = 0xAA;
+                networkBuffer[0] = 0xBB;
+                
+                Console.WriteLine($"  Processing: 0x{processingBuffer[0]:X2}, Network: 0x{networkBuffer[0]:X2}");
+                Console.WriteLine("  All resources will be cleaned up in reverse order...");
+            }
+
+            Console.WriteLine($"\nTotal allocator usage: {allocator.TotalAllocatedBytes} bytes");
+            Console.WriteLine();
         }
 
         // Example struct for interop
