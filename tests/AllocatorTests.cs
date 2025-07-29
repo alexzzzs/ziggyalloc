@@ -9,8 +9,8 @@ namespace ZiggyAlloc.Tests
         [Fact]
         public void ManualAllocator_BasicAllocation_Works()
         {
-            var allocator = new ManualAllocator();
-            var ptr = allocator.Alloc<int>();
+            var allocator = new ManualMemoryAllocator();
+            var ptr = allocator.Allocate<int>();
             
             Assert.False(ptr.IsNull);
             ptr.Value = 42;
@@ -22,8 +22,8 @@ namespace ZiggyAlloc.Tests
         [Fact]
         public void ManualAllocator_ZeroedAllocation_IsZeroed()
         {
-            var allocator = new ManualAllocator();
-            var slice = allocator.Slice<int>(10, zeroed: true);
+            var allocator = new ManualMemoryAllocator();
+            var slice = allocator.AllocateSlice<int>(10, zeroed: true);
             
             for (int i = 0; i < slice.Length; i++)
             {
@@ -36,11 +36,11 @@ namespace ZiggyAlloc.Tests
         [Fact]
         public void ScopedAllocator_AutomaticallyFreesAllAllocations()
         {
-            using var allocator = new ScopedAllocator();
+            using var allocator = new ScopedMemoryAllocator();
             
-            var ptr1 = allocator.Alloc<int>();
-            var ptr2 = allocator.Alloc<double>(5);
-            var slice = allocator.Slice<byte>(100);
+            var ptr1 = allocator.Allocate<int>();
+            var ptr2 = allocator.Allocate<double>(5);
+            var slice = allocator.AllocateSlice<byte>(100);
             
             ptr1.Value = 123;
             ptr2[0] = 3.14;
@@ -56,13 +56,13 @@ namespace ZiggyAlloc.Tests
         [Fact]
         public void DebugAllocator_DetectsLeaks()
         {
-            var backend = new ManualAllocator();
+            var backend = new ManualMemoryAllocator();
             bool leakDetected = false;
             
             try
             {
-                using var debugAllocator = new DebugAllocator("Test", backend, LeakReportingMode.Throw);
-                var ptr = debugAllocator.Alloc<int>();
+                using var debugAllocator = new DebugMemoryAllocator("Test", backend, MemoryLeakReportingMode.Throw);
+                var ptr = debugAllocator.Allocate<int>();
                 ptr.Value = 42;
                 // Intentionally not freeing to test leak detection
             }

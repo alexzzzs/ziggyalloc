@@ -30,8 +30,8 @@ namespace ZiggyAlloc.Examples
 
             // Manual allocator - explicit control
             Console.WriteLine("Manual Allocator:");
-            var manual = new ManualAllocator();
-            var ptr = manual.Alloc<int>(10);
+            var manual = new ManualMemoryAllocator();
+            var ptr = manual.Allocate<int>(10);
             for (int i = 0; i < 10; i++) ptr[i] = i * i;
             Console.WriteLine($"Allocated array, first few values: {ptr[0]}, {ptr[1]}, {ptr[2]}");
             manual.Free(ptr.Raw);
@@ -39,10 +39,10 @@ namespace ZiggyAlloc.Examples
 
             // Scoped allocator - automatic cleanup
             Console.WriteLine("Scoped Allocator:");
-            using (var scoped = new ScopedAllocator())
+            using (var scoped = new ScopedMemoryAllocator())
             {
-                var slice1 = scoped.Slice<double>(5, zeroed: true);
-                var slice2 = scoped.Slice<byte>(100);
+                var slice1 = scoped.AllocateSlice<double>(5, zeroed: true);
+                var slice2 = scoped.AllocateSlice<byte>(100);
                 
                 slice1[0] = 3.14159;
                 slice2[0] = 0xFF;
@@ -60,13 +60,13 @@ namespace ZiggyAlloc.Examples
 
             try
             {
-                using var debugAlloc = new DebugAllocator("LeakTest", Z.DefaultAllocator, LeakReportingMode.Throw);
+                using var debugAlloc = new DebugMemoryAllocator("LeakTest", ZiggyAllocDefaults.DefaultAllocator, MemoryLeakReportingMode.Throw);
                 
-                var ptr1 = debugAlloc.Alloc<int>();
+                var ptr1 = debugAlloc.Allocate<int>();
                 ptr1.Value = 42;
                 debugAlloc.Free(ptr1.Raw); // Properly freed
                 
-                var ptr2 = debugAlloc.Alloc<double>(5);
+                var ptr2 = debugAlloc.Allocate<double>(5);
                 ptr2[0] = 1.23;
                 // Intentionally not freeing ptr2 to demonstrate leak detection
                 
@@ -84,12 +84,12 @@ namespace ZiggyAlloc.Examples
             Console.WriteLine("3. High-Performance Buffer Operations");
             Console.WriteLine("------------------------------------");
 
-            using var allocator = new ScopedAllocator();
-            var ctx = new Ctx(allocator, Z.ctx.@out, Z.ctx.@in);
+            using var allocator = new ScopedMemoryAllocator();
+            var context = new AllocationContext(allocator, ZiggyAllocDefaults.DefaultContext.Output, ZiggyAllocDefaults.DefaultContext.Input);
 
             // Large buffer allocation
             const int bufferSize = 1024 * 1024; // 1MB
-            var buffer = ctx.AllocSlice<byte>(bufferSize, zeroed: true);
+            var buffer = context.AllocateSlice<byte>(bufferSize, zeroed: true);
             
             // Fast memory operations using Span<T>
             var span = buffer.AsSpan();
@@ -116,11 +116,11 @@ namespace ZiggyAlloc.Examples
             Console.WriteLine("4. Interop Scenarios");
             Console.WriteLine("-------------------");
 
-            using var defer = DeferScope.Start();
-            var ctx = new Ctx(Z.DefaultAllocator, Z.ctx.@out, Z.ctx.@in);
+            using var defer = DeferredCleanupScope.Create();
+            var context = ZiggyAllocDefaults.DefaultContext;
 
             // Simulate preparing data for native API call
-            var structArray = ctx.AllocSlice<Point3D>(defer, 1000, zeroed: true);
+            var structArray = context.AllocateSliceDeferred<Point3D>(defer, 1000, zeroed: true);
             
             // Fill with sample data
             for (int i = 0; i < structArray.Length; i++)
