@@ -4,38 +4,656 @@
         <name>ZiggyAlloc</name>
     </assembly>
     <members>
-        <member name="T:ZiggyAlloc.Pointer`1">
+        <member name="T:ZiggyAlloc.MemoryLeakReportingMode">
             <summary>
-            A type-safe wrapper around an unmanaged pointer.
-            Note: No implicit conversion to Span&lt;T&gt; is provided, as it would require
-            assuming a length of 1, which is unsafe for pointers to arrays.
-            Use the explicit .AsSpan(count) method for clarity and safety.
+            Defines how memory leaks should be reported when detected.
             </summary>
-            <typeparam name="T">The unmanaged type this pointer points to</typeparam>
         </member>
-        <member name="F:ZiggyAlloc.Pointer`1.Ptr">
-            <summary>The raw pointer value</summary>
+        <member name="F:ZiggyAlloc.MemoryLeakReportingMode.Log">
+            <summary>Log leak information to Console.Error</summary>
         </member>
-        <member name="M:ZiggyAlloc.Pointer`1.#ctor(System.IntPtr)">
-            <summary>Creates a new Pointer wrapper around the given raw pointer</summary>
+        <member name="F:ZiggyAlloc.MemoryLeakReportingMode.Throw">
+            <summary>Throw an InvalidOperationException with leak details</summary>
         </member>
-        <member name="P:ZiggyAlloc.Pointer`1.Value">
-            <summary>Gets a reference to the value at this pointer location</summary>
+        <member name="F:ZiggyAlloc.MemoryLeakReportingMode.Break">
+            <summary>Break into the debugger when leaks are detected</summary>
         </member>
-        <member name="P:ZiggyAlloc.Pointer`1.Item(System.Int32)">
-            <summary>Gets a reference to the value at the specified index from this pointer</summary>
+        <member name="T:ZiggyAlloc.DebugMemoryAllocator">
+            <summary>
+            A debug memory allocator that tracks allocations and detects memory leaks.
+            </summary>
+            <remarks>
+            This allocator wraps another allocator and tracks all allocations with caller information.
+            When disposed, it reports any memory that wasn't explicitly freed, helping to identify
+            memory leaks during development and testing.
+            
+            This allocator is thread-safe and can be used from multiple threads simultaneously.
+            The caller information (file, line, method) is captured automatically using compiler services.
+            </remarks>
         </member>
-        <member name="M:ZiggyAlloc.Pointer`1.AsSpan(System.Int32)">
-            <summary>Creates a Span view over the memory starting at this pointer</summary>
+        <member name="T:ZiggyAlloc.DebugMemoryAllocator.AllocationMetadata">
+            <summary>
+            Metadata about a memory allocation for leak tracking.
+            </summary>
         </member>
-        <member name="P:ZiggyAlloc.Pointer`1.Raw">
-            <summary>Gets the raw pointer value</summary>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.AllocationMetadata.#ctor(System.Int32,System.String,System.Int32,System.String)">
+            <summary>
+            Metadata about a memory allocation for leak tracking.
+            </summary>
         </member>
-        <member name="P:ZiggyAlloc.Pointer`1.IsNull">
-            <summary>Returns true if this pointer is null</summary>
+        <member name="P:ZiggyAlloc.DebugMemoryAllocator.SupportsIndividualDeallocation">
+            <summary>
+            Gets a value indicating whether this allocator supports individual memory deallocation.
+            </summary>
         </member>
-        <member name="M:ZiggyAlloc.Pointer`1.op_Implicit(ZiggyAlloc.Pointer{`0})~System.IntPtr">
-            <summary>Implicitly converts to IntPtr</summary>
+        <member name="P:ZiggyAlloc.DebugMemoryAllocator.TotalAllocatedBytes">
+            <summary>
+            Gets the total number of bytes currently allocated by this allocator.
+            </summary>
+        </member>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.#ctor(System.String,ZiggyAlloc.IUnmanagedMemoryAllocator,ZiggyAlloc.MemoryLeakReportingMode)">
+            <summary>
+            Initializes a new debug memory allocator.
+            </summary>
+            <param name="name">A descriptive name for this allocator instance (used in leak reports)</param>
+            <param name="backingAllocator">The underlying allocator to delegate actual memory operations to</param>
+            <param name="reportingMode">How to report memory leaks when detected</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when name or backingAllocator is null</exception>
+            <exception cref="T:System.ArgumentException">Thrown when name is empty or whitespace</exception>
+        </member>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.Allocate``1(System.Int32,System.Boolean)">
+            <summary>
+            Allocates unmanaged memory for the specified number of elements.
+            </summary>
+            <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
+            <param name="elementCount">The number of elements to allocate space for</param>
+            <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
+            <returns>A buffer representing the allocated memory</returns>
+            <exception cref="T:System.OutOfMemoryException">Thrown when memory allocation fails</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when elementCount is less than 0</exception>
+        </member>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.AllocateWithCallerInfo``1(System.Int32,System.Boolean,System.String,System.Int32,System.String)">
+            <summary>
+            Internal allocation method that captures caller information for leak tracking.
+            </summary>
+        </member>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.Free(System.IntPtr)">
+            <summary>
+            Frees previously allocated memory and removes it from leak tracking.
+            </summary>
+            <param name="pointer">The pointer to the memory to free</param>
+            <remarks>
+            Passing IntPtr.Zero is safe and will be ignored.
+            If the pointer was not allocated by this allocator, a warning is logged.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.Dispose">
+            <summary>
+            Reports any memory leaks (unfreed allocations) and disposes the allocator.
+            </summary>
+            <remarks>
+            The behavior depends on the MemoryLeakReportingMode specified during construction:
+            - Log: Writes leak information to Console.Error
+            - Throw: Throws InvalidOperationException with leak details
+            - Break: Breaks into the debugger if attached
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.ReportMemoryLeaks">
+            <summary>
+            Checks for and reports any memory leaks.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when leaks are detected and reporting mode is set to Throw
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.DebugMemoryAllocator.GetTrackedAllocationCount">
+            <summary>
+            Gets the number of currently tracked (unfreed) allocations.
+            </summary>
+            <returns>The number of allocations that haven't been freed</returns>
+        </member>
+        <member name="T:ZiggyAlloc.IUnmanagedMemoryAllocator">
+            <summary>
+            Defines the contract for unmanaged memory allocators.
+            </summary>
+            <remarks>
+            Allocators are responsible for managing unmanaged memory allocation and deallocation.
+            They provide the foundation for high-performance memory management scenarios where
+            garbage collection overhead needs to be avoided.
+            
+            Key use cases:
+            - Interop with native libraries requiring contiguous memory
+            - Large buffer allocations to reduce GC pressure
+            - Performance-critical scenarios in games, scientific computing, etc.
+            - Custom memory layout patterns (struct-of-arrays)
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.IUnmanagedMemoryAllocator.Allocate``1(System.Int32,System.Boolean)">
+            <summary>
+            Allocates unmanaged memory for the specified number of elements.
+            </summary>
+            <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
+            <param name="elementCount">The number of elements to allocate space for</param>
+            <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
+            <returns>A buffer representing the allocated memory</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown when elementCount is less than 0
+            </exception>
+            <exception cref="T:System.OutOfMemoryException">
+            Thrown when memory allocation fails
+            </exception>
+            <remarks>
+            The returned buffer owns the allocated memory and will free it when disposed.
+            For zero-length allocations, a valid but empty buffer is returned.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.IUnmanagedMemoryAllocator.Free(System.IntPtr)">
+            <summary>
+            Frees previously allocated unmanaged memory.
+            </summary>
+            <param name="pointer">The pointer to the memory to free</param>
+            <remarks>
+            Passing IntPtr.Zero is safe and will be ignored.
+            Freeing the same pointer twice may result in undefined behavior.
+            This method is primarily used internally by UnmanagedBuffer disposal.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.IUnmanagedMemoryAllocator.SupportsIndividualDeallocation">
+            <summary>
+            Gets a value indicating whether this allocator supports individual memory deallocation.
+            </summary>
+            <remarks>
+            Some allocators (like arena allocators) may not support freeing individual allocations.
+            When false, calling Free() may throw NotSupportedException.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.IUnmanagedMemoryAllocator.TotalAllocatedBytes">
+            <summary>
+            Gets the total number of bytes currently allocated by this allocator.
+            </summary>
+            <remarks>
+            Returns -1 if the allocator doesn't track memory usage.
+            This is useful for monitoring memory consumption and detecting leaks.
+            </remarks>
+        </member>
+        <member name="T:ZiggyAlloc.ScopedMemoryAllocator">
+            <summary>
+            A scoped memory allocator that automatically frees all allocated memory when disposed.
+            </summary>
+            <remarks>
+            This allocator is ideal for scenarios where you want automatic cleanup of all allocations
+            at the end of a scope. Individual allocations cannot be freed - all memory is freed
+            when the allocator is disposed. This follows the RAII (Resource Acquisition Is Initialization)
+            pattern and is similar to arena allocators.
+            
+            This allocator is NOT thread-safe. Use separate instances for different threads.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.ScopedMemoryAllocator.SupportsIndividualDeallocation">
+            <summary>
+            Gets a value indicating whether this allocator supports individual memory deallocation.
+            </summary>
+            <remarks>
+            Scoped allocators do not support individual deallocation - all memory is freed when disposed.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.ScopedMemoryAllocator.TotalAllocatedBytes">
+            <summary>
+            Gets the total number of bytes currently allocated by this allocator.
+            </summary>
+        </member>
+        <member name="M:ZiggyAlloc.ScopedMemoryAllocator.Allocate``1(System.Int32,System.Boolean)">
+            <summary>
+            Allocates unmanaged memory for the specified number of elements.
+            </summary>
+            <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
+            <param name="elementCount">The number of elements to allocate space for</param>
+            <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
+            <returns>A buffer representing the allocated memory</returns>
+            <exception cref="T:System.OutOfMemoryException">Thrown when memory allocation fails</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when elementCount is less than 0</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the allocator has been disposed</exception>
+        </member>
+        <member name="M:ZiggyAlloc.ScopedMemoryAllocator.Free(System.IntPtr)">
+            <summary>
+            Individual memory deallocation is not supported in scoped allocators.
+            All memory is automatically freed when the allocator is disposed.
+            </summary>
+            <param name="pointer">The pointer to free (ignored)</param>
+            <exception cref="T:System.NotSupportedException">Always thrown as individual deallocation is not supported</exception>
+        </member>
+        <member name="M:ZiggyAlloc.ScopedMemoryAllocator.Dispose">
+            <summary>
+            Frees all allocated memory and disposes the allocator.
+            </summary>
+            <remarks>
+            Memory is freed in reverse order of allocation (LIFO - Last In, First Out).
+            After disposal, the allocator cannot be used for further allocations.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.ScopedMemoryAllocator.ThrowIfDisposed">
+            <summary>
+            Throws ObjectDisposedException if the allocator has been disposed.
+            </summary>
+        </member>
+        <member name="T:ZiggyAlloc.SystemMemoryAllocator">
+            <summary>
+            A memory allocator that uses the system's native memory allocation functions.
+            </summary>
+            <remarks>
+            This allocator provides direct access to the platform's native memory allocation:
+            - On .NET 6+: Uses NativeMemory.Alloc/Free for optimal performance
+            - On older versions: Uses Marshal.AllocHGlobal/FreeHGlobal
+            
+            Key characteristics:
+            - Thread-safe: Can be used from multiple threads simultaneously
+            - Individual deallocation: Supports freeing specific allocations
+            - Memory tracking: Tracks total allocated bytes for monitoring
+            - High performance: Direct system calls with minimal overhead
+            
+            Best used for:
+            - General-purpose unmanaged memory allocation
+            - Interop scenarios requiring native memory
+            - Long-lived allocations with explicit lifetime management
+            - Performance-critical code where GC pressure must be avoided
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.SystemMemoryAllocator.SupportsIndividualDeallocation">
+            <summary>
+            Gets a value indicating that this allocator supports individual memory deallocation.
+            </summary>
+        </member>
+        <member name="P:ZiggyAlloc.SystemMemoryAllocator.TotalAllocatedBytes">
+            <summary>
+            Gets the total number of bytes currently allocated by this allocator.
+            </summary>
+            <remarks>
+            This value is updated atomically and reflects the current memory usage.
+            It can be used for monitoring memory consumption and detecting leaks.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.SystemMemoryAllocator.Allocate``1(System.Int32,System.Boolean)">
+            <summary>
+            Allocates unmanaged memory for the specified number of elements.
+            </summary>
+            <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
+            <param name="elementCount">The number of elements to allocate space for</param>
+            <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
+            <returns>A buffer representing the allocated memory</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown when elementCount is less than 0
+            </exception>
+            <exception cref="T:System.OutOfMemoryException">
+            Thrown when memory allocation fails
+            </exception>
+            <exception cref="T:System.OverflowException">
+            Thrown when the total size calculation overflows
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.SystemMemoryAllocator.Free(System.IntPtr)">
+            <summary>
+            Frees previously allocated unmanaged memory.
+            </summary>
+            <param name="pointer">The pointer to the memory to free</param>
+            <remarks>
+            Passing IntPtr.Zero is safe and will be ignored.
+            This method is thread-safe and updates the allocation tracking.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.SystemMemoryAllocator.WrapExisting``1(System.IntPtr,System.Int32)">
+            <summary>
+            Creates a buffer that wraps existing memory without owning it.
+            </summary>
+            <typeparam name="T">The unmanaged type the memory represents</typeparam>
+            <param name="pointer">Pointer to the existing memory</param>
+            <param name="elementCount">Number of elements the memory can hold</param>
+            <returns>A buffer that wraps the existing memory</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown when elementCount is less than 0
+            </exception>
+            <remarks>
+            The returned buffer will not free the memory when disposed.
+            Use this for wrapping stack-allocated memory or memory allocated elsewhere.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.SystemMemoryAllocator.WrapSpan``1(System.Span{``0})">
+            <summary>
+            Creates a buffer that wraps a span's memory without owning it.
+            </summary>
+            <typeparam name="T">The unmanaged type the span contains</typeparam>
+            <param name="span">The span to wrap</param>
+            <returns>A buffer that wraps the span's memory</returns>
+            <remarks>
+            The returned buffer will not free the memory when disposed.
+            The buffer is only valid as long as the original span remains valid.
+            </remarks>
+        </member>
+        <member name="T:ZiggyAlloc.UnmanagedBuffer`1">
+            <summary>
+            Represents a buffer of unmanaged memory with type-safe access and automatic cleanup options.
+            </summary>
+            <typeparam name="T">The unmanaged type stored in the buffer</typeparam>
+            <remarks>
+            This type provides a safe wrapper around unmanaged memory allocations, offering:
+            - Type-safe access to unmanaged memory
+            - Bounds checking for array access
+            - Conversion to Span&lt;T&gt; for high-performance operations
+            - Integration with native APIs through raw pointer access
+            - Optional automatic cleanup through IDisposable
+            
+            Primary use cases:
+            - Interop with native libraries requiring contiguous memory
+            - Large buffer allocations to avoid GC pressure
+            - Performance-critical scenarios requiring direct memory control
+            - Custom memory layout patterns (struct-of-arrays)
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.Length">
+            <summary>
+            Gets the number of elements in the buffer.
+            </summary>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.IsEmpty">
+            <summary>
+            Gets a value indicating whether the buffer is empty (length is 0).
+            </summary>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.IsValid">
+            <summary>
+            Gets a value indicating whether the buffer points to valid memory.
+            </summary>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.RawPointer">
+            <summary>
+            Gets the raw pointer to the buffer memory.
+            </summary>
+            <remarks>
+            Use this for interop with native APIs. The pointer remains valid
+            until the buffer is disposed (if it owns the memory).
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.SizeInBytes">
+            <summary>
+            Gets the size of the buffer in bytes.
+            </summary>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.#ctor(`0*,System.Int32,ZiggyAlloc.IUnmanagedMemoryAllocator)">
+            <summary>
+            Initializes a new buffer that owns its memory and will free it when disposed.
+            </summary>
+            <param name="pointer">Pointer to the allocated memory</param>
+            <param name="length">Number of elements in the buffer</param>
+            <param name="allocator">The allocator used to allocate the memory</param>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.#ctor(`0*,System.Int32)">
+            <summary>
+            Initializes a new buffer that wraps existing memory without owning it.
+            </summary>
+            <param name="pointer">Pointer to the existing memory</param>
+            <param name="length">Number of elements in the buffer</param>
+            <remarks>
+            The buffer will not free the memory when disposed. Use this for wrapping
+            memory allocated elsewhere or for stack-allocated memory.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.Item(System.Int32)">
+            <summary>
+            Gets or sets the element at the specified index.
+            </summary>
+            <param name="index">The zero-based index of the element</param>
+            <returns>A reference to the element at the specified index</returns>
+            <exception cref="T:System.IndexOutOfRangeException">
+            Thrown when index is less than 0 or greater than or equal to Length
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is not valid (null pointer)
+            </exception>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.First">
+            <summary>
+            Gets a reference to the first element in the buffer.
+            </summary>
+            <returns>A reference to the first element</returns>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is empty or not valid
+            </exception>
+        </member>
+        <member name="P:ZiggyAlloc.UnmanagedBuffer`1.Last">
+            <summary>
+            Gets a reference to the last element in the buffer.
+            </summary>
+            <returns>A reference to the last element</returns>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is empty or not valid
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.AsSpan">
+            <summary>
+            Converts the buffer to a Span&lt;T&gt; for high-performance operations.
+            </summary>
+            <returns>A span representing the buffer contents</returns>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is not valid (null pointer)
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.AsSpan(System.Int32,System.Int32)">
+            <summary>
+            Converts a portion of the buffer to a Span&lt;T&gt;.
+            </summary>
+            <param name="start">The starting index</param>
+            <param name="length">The number of elements to include</param>
+            <returns>A span representing the specified portion of the buffer</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown when start or length is invalid
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is not valid (null pointer)
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.AsReadOnlySpan">
+            <summary>
+            Converts the buffer to a ReadOnlySpan&lt;T&gt;.
+            </summary>
+            <returns>A read-only span representing the buffer contents</returns>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is not valid (null pointer)
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.Fill(`0)">
+            <summary>
+            Fills the entire buffer with the specified value.
+            </summary>
+            <param name="value">The value to fill the buffer with</param>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is not valid (null pointer)
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.Clear">
+            <summary>
+            Clears the buffer by setting all bytes to zero.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is not valid (null pointer)
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.CopyFrom(ZiggyAlloc.UnmanagedBuffer{`0})">
+            <summary>
+            Copies data from another buffer to this buffer.
+            </summary>
+            <param name="source">The source buffer to copy from</param>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the source buffer is larger than this buffer
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when either buffer is not valid
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.CopyFrom(System.ReadOnlySpan{`0})">
+            <summary>
+            Copies data from a span to this buffer.
+            </summary>
+            <param name="source">The source span to copy from</param>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the source span is larger than this buffer
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the buffer is not valid
+            </exception>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.Dispose">
+            <summary>
+            Frees the buffer memory if it's owned by this instance.
+            </summary>
+            <remarks>
+            After disposal, the buffer should not be used. If the buffer doesn't own
+            its memory (created with the non-owning constructor), this method does nothing.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.op_Implicit(ZiggyAlloc.UnmanagedBuffer{`0})~System.Span{`0}">
+            <summary>
+            Implicitly converts the buffer to a Span&lt;T&gt;.
+            </summary>
+            <param name="buffer">The buffer to convert</param>
+            <returns>A span representing the buffer contents</returns>
+        </member>
+        <member name="M:ZiggyAlloc.UnmanagedBuffer`1.op_Implicit(ZiggyAlloc.UnmanagedBuffer{`0})~System.ReadOnlySpan{`0}">
+            <summary>
+            Implicitly converts the buffer to a ReadOnlySpan&lt;T&gt;.
+            </summary>
+            <param name="buffer">The buffer to convert</param>
+            <returns>A read-only span representing the buffer contents</returns>
+        </member>
+        <member name="T:ZiggyAlloc.AutoFreeMemory`1">
+            <summary>
+            Provides automatic memory management using RAII (Resource Acquisition Is Initialization) pattern.
+            </summary>
+            <typeparam name="T">The unmanaged type being managed</typeparam>
+            <remarks>
+            This ref struct automatically frees allocated memory when it goes out of scope or is explicitly disposed.
+            It's designed to be used with 'using' statements to ensure deterministic cleanup.
+            
+            Being a ref struct, it cannot be boxed, stored in fields of reference types, or used across await boundaries.
+            This ensures stack-only allocation and prevents accidental memory leaks from forgotten cleanup.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.AutoFreeMemory`1.Buffer">
+            <summary>
+            Gets the buffer representing the allocated memory.
+            </summary>
+            <remarks>
+            This buffer remains valid until the AutoFreeMemory instance is disposed.
+            Do not use this buffer after disposal as it will point to freed memory.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.AutoFreeMemory`1.Value">
+            <summary>
+            Gets a reference to the value at the allocated memory location.
+            </summary>
+            <remarks>
+            For single-element allocations, this provides convenient access to the value.
+            For multi-element allocations, this refers to the first element.
+            The reference remains valid until the AutoFreeMemory instance is disposed.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.AutoFreeMemory`1.#ctor(ZiggyAlloc.IUnmanagedMemoryAllocator,System.Int32,System.Boolean)">
+            <summary>
+            Initializes a new AutoFreeMemory instance with allocated memory.
+            </summary>
+            <param name="allocator">The allocator to use for memory operations</param>
+            <param name="elementCount">The number of elements to allocate</param>
+            <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when allocator is null</exception>
+            <exception cref="T:System.OutOfMemoryException">Thrown when memory allocation fails</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when elementCount is less than 0</exception>
+        </member>
+        <member name="M:ZiggyAlloc.AutoFreeMemory`1.Dispose">
+            <summary>
+            Frees the allocated memory.
+            </summary>
+            <remarks>
+            This method is called automatically when the AutoFreeMemory instance goes out of scope
+            or when used in a 'using' statement. After disposal, the Buffer and Value properties
+            should not be accessed as they will refer to freed memory.
+            </remarks>
+        </member>
+        <member name="T:ZiggyAlloc.DeferredCleanupScope">
+            <summary>
+            Manages deferred cleanup actions that are executed in reverse order when the scope is disposed.
+            </summary>
+            <remarks>
+            This class implements Zig's defer pattern, where cleanup actions are registered during execution
+            and automatically run in LIFO (Last In, First Out) order when the scope ends. This ensures
+            that resources are cleaned up in the reverse order of their acquisition, which is typically
+            the safest approach for nested resource management.
+            
+            The deferred actions are executed even if exceptions occur, making this suitable for
+            deterministic resource cleanup in both success and error scenarios.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.DeferredCleanupScope.DeferAction(System.Action)">
+            <summary>
+            Registers an action to be executed when the scope is disposed.
+            </summary>
+            <param name="cleanupAction">The action to execute during cleanup</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when cleanupAction is null</exception>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the scope has already been disposed</exception>
+            <remarks>
+            Actions are executed in reverse order of registration (LIFO - Last In, First Out).
+            This ensures that resources are cleaned up in the reverse order of their acquisition.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.DeferredCleanupScope.Dispose">
+            <summary>
+            Executes all deferred actions in reverse order and disposes the scope.
+            </summary>
+            <remarks>
+            Actions are executed in LIFO order (Last In, First Out). If any action throws an exception,
+            the remaining actions will still be executed, but the first exception will be re-thrown
+            after all cleanup attempts are complete.
+            
+            After disposal, no new actions can be deferred and the scope cannot be reused.
+            </remarks>
+        </member>
+        <member name="M:ZiggyAlloc.DeferredCleanupScope.Create">
+            <summary>
+            Creates and returns a new deferred cleanup scope.
+            </summary>
+            <returns>A new DeferredCleanupScope instance ready for use</returns>
+            <remarks>
+            This is a convenience method equivalent to calling 'new DeferredCleanupScope()'.
+            The returned scope should be used with a 'using' statement to ensure proper disposal.
+            </remarks>
+        </member>
+        <member name="P:ZiggyAlloc.DeferredCleanupScope.DeferredActionCount">
+            <summary>
+            Gets the number of deferred actions currently registered.
+            </summary>
+            <returns>The number of actions that will be executed during disposal</returns>
+            <exception cref="T:System.ObjectDisposedException">Thrown when the scope has been disposed</exception>
+        </member>
+        <member name="M:ZiggyAlloc.DeferredCleanupScope.ThrowIfDisposed">
+            <summary>
+            Throws ObjectDisposedException if the scope has been disposed.
+            </summary>
+        </member>
+        <member name="T:ZiggyAlloc.Z">
+            <summary>
+            Provides convenient static access to commonly used ZiggyAlloc components.
+            </summary>
+            <remarks>
+            This class offers quick access to a default allocator for simple use cases.
+            For more complex scenarios or when you need specific allocator configurations,
+            create your own instances directly.
+            </remarks>
+        </member>
+        <member name="F:ZiggyAlloc.Z.DefaultAllocator">
+            <summary>
+            Gets the default system memory allocator instance.
+            </summary>
+            <remarks>
+            This allocator uses the platform's native memory allocation functions.
+            It's thread-safe and suitable for most general-purpose scenarios.
+            </remarks>
         </member>
     </members>
 </doc>

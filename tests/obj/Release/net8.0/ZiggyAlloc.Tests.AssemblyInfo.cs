@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ZiggyAlloc.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ad425e7b33040ba260377d2c92adc8d889b2ec0")]
 [assembly: System.Reflection.AssemblyProductAttribute("ZiggyAlloc.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ZiggyAlloc.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

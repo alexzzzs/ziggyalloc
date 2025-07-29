@@ -100,3 +100,4 @@ C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Release\net8.0\refint\ZiggyAlloc.Tes
 C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Release\net8.0\ZiggyAlloc.Tests.pdb
 C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Release\net8.0\ZiggyAlloc.Tests.genruntimeconfig.cache
 C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Release\net8.0\ref\ZiggyAlloc.Tests.dll
+C:\Users\annab\Desktop\ZiggyAlloc\tests\obj\Release\net8.0\ZiggyAlloc.Tests.sourcelink.json

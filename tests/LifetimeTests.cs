@@ -7,88 +7,116 @@ namespace ZiggyAlloc.Tests
     public class LifetimeTests
     {
         [Fact]
-        public void AutoFree_AutomaticallyFreesMemory()
+        public void UnmanagedBuffer_UsingStatement_AutomaticallyDisposesMemory()
         {
-            var allocator = new ManualAllocator();
-            var ctx = new Ctx(allocator, new ConsoleWriter(), new ConsoleReader());
+            var allocator = new SystemMemoryAllocator();
             
-            using (var auto = ctx.Auto<int>())
+            // Test that using statement properly disposes the buffer
+            using (var buffer = allocator.Allocate<int>(10))
             {
-                auto.Value = 42;
-                Assert.Equal(42, auto.Value);
+                buffer[0] = 42;
+                Assert.Equal(42, buffer[0]);
+                Assert.True(buffer.IsValid);
             } // Memory should be freed here
             
             // No way to directly test if memory was freed without causing undefined behavior,
-            // but the test passes if no exceptions are thrown
+            // but the test passes if no exceptions are thrown during disposal
         }
 
         [Fact]
-        public void DeferScope_ExecutesActionsInReverseOrder()
+        public void ScopedAllocator_DisposesAllAllocationsAtOnce()
         {
-            var executionOrder = new System.Collections.Generic.List<int>();
-            
-            using (var defer = DeferScope.Start())
+            using (var scopedAllocator = new ScopedMemoryAllocator())
             {
-                defer.Defer(() => executionOrder.Add(1));
-                defer.Defer(() => executionOrder.Add(2));
-                defer.Defer(() => executionOrder.Add(3));
-            } // Actions should execute here in reverse order: 3, 2, 1
-            
-            Assert.Equal(new[] { 3, 2, 1 }, executionOrder);
-        }
-
-        [Fact]
-        public void DeferScope_WithAllocations_FreesMemoryInCorrectOrder()
-        {
-            var allocator = new ManualAllocator();
-            var freedPointers = new System.Collections.Generic.List<IntPtr>();
-            
-            // Create a test allocator that tracks frees
-            var testAllocator = new TestAllocator(allocator, ptr => freedPointers.Add(ptr));
-            
-            IntPtr ptr1, ptr2;
-            
-            using (var defer = DeferScope.Start())
-            {
-                var p1 = testAllocator.Alloc<int>();
-                ptr1 = p1.Raw;
-                var ptr1Copy = p1.Raw;
-                defer.Defer(() => testAllocator.Free(ptr1Copy));
+                // Allocate multiple buffers
+                using var buffer1 = scopedAllocator.Allocate<int>(100);
+                using var buffer2 = scopedAllocator.Allocate<double>(50);
+                using var buffer3 = scopedAllocator.Allocate<byte>(1000);
                 
-                var p2 = testAllocator.Alloc<double>();
-                ptr2 = p2.Raw;
-                var ptr2Copy = p2.Raw;
-                defer.Defer(() => testAllocator.Free(ptr2Copy));
-            }
-            
-            // Should free in reverse order: ptr2, then ptr1
-            Assert.Equal(2, freedPointers.Count);
-            Assert.Equal(ptr2, freedPointers[0]);
-            Assert.Equal(ptr1, freedPointers[1]);
+                // Verify they work
+                buffer1[0] = 42;
+                buffer2[0] = 3.14;
+                buffer3[0] = 255;
+                
+                Assert.Equal(42, buffer1[0]);
+                Assert.Equal(3.14, buffer2[0]);
+                Assert.Equal(255, buffer3[0]);
+                
+                // All allocations should be tracked
+                Assert.True(scopedAllocator.TotalAllocatedBytes > 0);
+            } // All memory should be freed when scoped allocator is disposed
         }
 
-        private class TestAllocator : IAllocator
+        [Fact]
+        public void DebugAllocator_TracksAllocationLifetime()
         {
-            private readonly IAllocator _backend;
-            private readonly Action<IntPtr> _onFree;
-
-            public TestAllocator(IAllocator backend, Action<IntPtr> onFree)
+            var backend = new SystemMemoryAllocator();
+            using var debugAllocator = new DebugMemoryAllocator("Test", backend);
+            
+            // Initially no allocations
+            Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
+            
+            // Allocate and verify tracking
+            using (var buffer = debugAllocator.Allocate<int>(10))
             {
-                _backend = backend;
-                _onFree = onFree;
-            }
+                Assert.Equal(1, debugAllocator.GetTrackedAllocationCount());
+                buffer[0] = 42;
+            } // Buffer disposed here
+            
+            // Should be no tracked allocations after disposal
+            Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
+        }
 
-            public Pointer<T> Alloc<T>(int count = 1, bool zeroed = false) where T : unmanaged
-                => _backend.Alloc<T>(count, zeroed);
+        [Fact]
+        public void MultipleAllocators_IndependentLifetimes()
+        {
+            var allocator1 = new SystemMemoryAllocator();
+            var allocator2 = new SystemMemoryAllocator();
+            
+            using var buffer1 = allocator1.Allocate<int>(100);
+            using var buffer2 = allocator2.Allocate<double>(50);
+            
+            // Each allocator tracks its own allocations
+            Assert.True(allocator1.TotalAllocatedBytes >= 100 * sizeof(int));
+            Assert.True(allocator2.TotalAllocatedBytes >= 50 * sizeof(double));
+            
+            // Buffers should be independent
+            buffer1[0] = 42;
+            buffer2[0] = 3.14;
+            
+            Assert.Equal(42, buffer1[0]);
+            Assert.Equal(3.14, buffer2[0]);
+        }
 
-            public void Free(IntPtr ptr)
-            {
-                _onFree(ptr);
-                _backend.Free(ptr);
-            }
+        [Fact]
+        public void UnmanagedBuffer_FirstAndLastProperties_Work()
+        {
+            var allocator = new SystemMemoryAllocator();
+            using var buffer = allocator.Allocate<int>(5);
+            
+            // Set first and last elements
+            buffer.First = 100;
+            buffer.Last = 200;
+            
+            Assert.Equal(100, buffer[0]);
+            Assert.Equal(200, buffer[4]);
+            Assert.Equal(100, buffer.First);
+            Assert.Equal(200, buffer.Last);
+        }
 
-            public Slice<T> Slice<T>(int count, bool zeroed = false) where T : unmanaged
-                => _backend.Slice<T>(count, zeroed);
+        [Fact]
+        public void UnmanagedBuffer_EmptyBuffer_HandledCorrectly()
+        {
+            var allocator = new SystemMemoryAllocator();
+            using var buffer = allocator.Allocate<int>(0);
+            
+            Assert.True(buffer.IsEmpty);
+            Assert.Equal(0, buffer.Length);
+            Assert.Equal(0, buffer.SizeInBytes);
+            
+            // Should throw when accessing First/Last on empty buffer
+            Assert.Throws<InvalidOperationException>(() => buffer.First);
+            Assert.Throws<InvalidOperationException>(() => buffer.Last);
         }
     }
 }

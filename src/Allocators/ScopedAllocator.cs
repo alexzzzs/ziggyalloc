@@ -47,9 +47,15 @@ namespace ZiggyAlloc
         {
             ThrowIfDisposed();
             
-            var buffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
-            _allocatedPointers.Add(buffer.RawPointer);
-            return buffer;
+            var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
+            _allocatedPointers.Add(backingBuffer.RawPointer);
+            
+            // Create a buffer that doesn't own the memory (won't call Free on dispose)
+            // The ScopedMemoryAllocator will handle freeing all memory when it's disposed
+            unsafe
+            {
+                return new UnmanagedBuffer<T>((T*)backingBuffer.RawPointer, backingBuffer.Length);
+            }
         }
 
         /// <summary>

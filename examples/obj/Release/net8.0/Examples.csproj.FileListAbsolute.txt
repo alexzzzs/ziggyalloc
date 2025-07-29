@@ -17,3 +17,4 @@ C:\Users\annab\Desktop\ZiggyAlloc\examples\obj\Release\net8.0\refint\Examples.dl
 C:\Users\annab\Desktop\ZiggyAlloc\examples\obj\Release\net8.0\Examples.pdb
 C:\Users\annab\Desktop\ZiggyAlloc\examples\obj\Release\net8.0\Examples.genruntimeconfig.cache
 C:\Users\annab\Desktop\ZiggyAlloc\examples\obj\Release\net8.0\ref\Examples.dll
+C:\Users\annab\Desktop\ZiggyAlloc\examples\obj\Release\net8.0\Examples.sourcelink.json

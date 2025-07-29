@@ -98,7 +98,7 @@ namespace ZiggyAlloc
             [CallerLineNumber] int sourceLine = 0,
             [CallerMemberName] string callerMember = "") where T : unmanaged
         {
-            var buffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
+            var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
             
             int sizeInBytes;
             unsafe { sizeInBytes = sizeof(T) * elementCount; }
@@ -107,10 +107,15 @@ namespace ZiggyAlloc
             
             lock (_lockObject)
             {
-                _trackedAllocations.Add(buffer.RawPointer, metadata);
+                _trackedAllocations.Add(backingBuffer.RawPointer, metadata);
             }
             
-            return buffer;
+            // Create a new buffer that references this debug allocator instead of the backing allocator
+            // This ensures that when the buffer is disposed, it calls our Free method for tracking
+            unsafe
+            {
+                return new UnmanagedBuffer<T>((T*)backingBuffer.RawPointer, backingBuffer.Length, this);
+            }
         }
 
         /// <summary>
