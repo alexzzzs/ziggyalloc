@@ -30,7 +30,7 @@ namespace ZiggyAlloc
     /// This allocator is thread-safe and can be used from multiple threads simultaneously.
     /// The caller information (file, line, method) is captured automatically using compiler services.
     /// </remarks>
-    public sealed class DebugMemoryAllocator : IMemoryAllocator, IDisposable
+    public sealed class DebugMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
         /// <summary>
         /// Metadata about a memory allocation for leak tracking.
@@ -42,10 +42,20 @@ namespace ZiggyAlloc
             string CallerMemberName);
 
         private readonly Dictionary<IntPtr, AllocationMetadata> _trackedAllocations = new();
-        private readonly IMemoryAllocator _backingAllocator;
+        private readonly IUnmanagedMemoryAllocator _backingAllocator;
         private readonly string _allocatorName;
         private readonly MemoryLeakReportingMode _leakReportingMode;
         private readonly object _lockObject = new();
+
+        /// <summary>
+        /// Gets a value indicating whether this allocator supports individual memory deallocation.
+        /// </summary>
+        public bool SupportsIndividualDeallocation => _backingAllocator.SupportsIndividualDeallocation;
+
+        /// <summary>
+        /// Gets the total number of bytes currently allocated by this allocator.
+        /// </summary>
+        public long TotalAllocatedBytes => _backingAllocator.TotalAllocatedBytes;
 
         /// <summary>
         /// Initializes a new debug memory allocator.
@@ -55,7 +65,7 @@ namespace ZiggyAlloc
         /// <param name="reportingMode">How to report memory leaks when detected</param>
         /// <exception cref="ArgumentNullException">Thrown when name or backingAllocator is null</exception>
         /// <exception cref="ArgumentException">Thrown when name is empty or whitespace</exception>
-        public DebugMemoryAllocator(string name, IMemoryAllocator backingAllocator, 
+        public DebugMemoryAllocator(string name, IUnmanagedMemoryAllocator backingAllocator, 
             MemoryLeakReportingMode reportingMode = MemoryLeakReportingMode.Log)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -67,40 +77,40 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Allocates memory for one or more instances of the specified unmanaged type.
+        /// Allocates unmanaged memory for the specified number of elements.
         /// </summary>
         /// <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
-        /// <param name="count">The number of instances to allocate space for</param>
-        /// <param name="zeroed">Whether to zero-initialize the allocated memory</param>
-        /// <returns>A pointer to the allocated memory</returns>
+        /// <param name="elementCount">The number of elements to allocate space for</param>
+        /// <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
+        /// <returns>A buffer representing the allocated memory</returns>
         /// <exception cref="OutOfMemoryException">Thrown when memory allocation fails</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when count is less than 1</exception>
-        public Pointer<T> Allocate<T>(int count = 1, bool zeroed = false) where T : unmanaged
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when elementCount is less than 0</exception>
+        public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
-            return AllocateWithCallerInfo<T>(count, zeroed);
+            return AllocateWithCallerInfo<T>(elementCount, zeroMemory);
         }
 
         /// <summary>
         /// Internal allocation method that captures caller information for leak tracking.
         /// </summary>
-        private Pointer<T> AllocateWithCallerInfo<T>(int count = 1, bool zeroed = false,
+        private UnmanagedBuffer<T> AllocateWithCallerInfo<T>(int elementCount, bool zeroMemory = false,
             [CallerFilePath] string sourceFile = "",
             [CallerLineNumber] int sourceLine = 0,
             [CallerMemberName] string callerMember = "") where T : unmanaged
         {
-            var pointer = _backingAllocator.Allocate<T>(count, zeroed);
+            var buffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
             
             int sizeInBytes;
-            unsafe { sizeInBytes = sizeof(T) * count; }
+            unsafe { sizeInBytes = sizeof(T) * elementCount; }
             
             var metadata = new AllocationMetadata(sizeInBytes, sourceFile, sourceLine, callerMember);
             
             lock (_lockObject)
             {
-                _trackedAllocations.Add(pointer.Raw, metadata);
+                _trackedAllocations.Add(buffer.RawPointer, metadata);
             }
             
-            return pointer;
+            return buffer;
         }
 
         /// <summary>
@@ -131,25 +141,7 @@ namespace ZiggyAlloc
             _backingAllocator.Free(pointer);
         }
 
-        /// <summary>
-        /// Allocates memory for a slice (array) of the specified unmanaged type.
-        /// </summary>
-        /// <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
-        /// <param name="count">The number of elements in the slice</param>
-        /// <param name="zeroed">Whether to zero-initialize the allocated memory</param>
-        /// <returns>A slice representing the allocated memory</returns>
-        /// <exception cref="OutOfMemoryException">Thrown when memory allocation fails</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when count is less than 0</exception>
-        public Slice<T> AllocateSlice<T>(int count, bool zeroed = false) where T : unmanaged
-        {
-            if (count < 0)
-                throw new ArgumentOutOfRangeException(nameof(count), "Count cannot be negative");
 
-            if (count == 0)
-                return new Slice<T>(new Pointer<T>(IntPtr.Zero), 0);
-
-            return new Slice<T>(AllocateWithCallerInfo<T>(count, zeroed), count);
-        }
 
         /// <summary>
         /// Reports any memory leaks (unfreed allocations) and disposes the allocator.

@@ -92,156 +92,116 @@ UpdateParticlePhysics(positions, velocities, masses, deltaTime);
 
 ZiggyAlloc provides three main allocator types:
 
-#### ManualAllocator
-Basic malloc/free style allocation with manual memory management:
+#### SystemMemoryAllocator
+High-performance allocator using native system calls:
 
 ```csharp
-var allocator = new ManualAllocator();
-var ptr = allocator.Alloc<int>();
-ptr.Value = 42;
-allocator.Free(ptr.Raw); // Manual cleanup required
+var allocator = new SystemMemoryAllocator();
+using var buffer = allocator.Allocate<int>(10, zeroMemory: true);
+
+// Array-like access with bounds checking
+buffer[0] = 42;
+int value = buffer[9];
+
+// Automatic cleanup with 'using'
+// Memory freed when buffer goes out of scope
 ```
 
-#### ScopedAllocator  
+#### ScopedMemoryAllocator  
 Automatically frees all allocations when disposed:
 
 ```csharp
-using var allocator = new ScopedAllocator();
-var ptr1 = allocator.Alloc<int>();
-var ptr2 = allocator.Alloc<double>(10);
-// All allocations freed automatically on dispose
+using var allocator = new ScopedMemoryAllocator();
+using var buffer1 = allocator.Allocate<int>(5);
+using var buffer2 = allocator.Allocate<double>(10);
+
+// All allocations freed automatically when allocator is disposed
 ```
 
-#### DebugAllocator
+#### DebugMemoryAllocator
 Tracks allocations and reports memory leaks with caller information:
 
 ```csharp
-using var debugAlloc = new DebugAllocator("MyComponent", Z.DefaultAllocator);
-var ptr = debugAlloc.Alloc<int>();
-// Forgot to free - will report leak with file/line info on dispose
-```
+using var debugAlloc = new DebugMemoryAllocator("MyComponent", Z.DefaultAllocator);
+using var buffer = debugAlloc.Allocate<int>(1);
+buffer[0] = 42;
 
-### Context System
-
-Pass allocators and I/O through context structures, Zig-style:
-
-```csharp
-var ctx = new Ctx(allocator, writer, reader);
-
-// All allocation methods available through context
-var data = ctx.AllocSlice<byte>(1024);
-ctx.PrintLine("Allocated 1KB");
-```
-
-### Defer Scopes
-
-Automatic cleanup with deferred actions:
-
-```csharp
-using var defer = DeferScope.Start();
-
-var ptr1 = ctx.Alloc<int>(defer);     // Will be freed automatically
-var ptr2 = ctx.Alloc<double>(defer); // Will be freed automatically
-
-defer.Defer(() => Console.WriteLine("Custom cleanup"));
-// Cleanup happens in reverse order: custom action, ptr2, ptr1
+// If you forget to dispose buffer, leak will be reported with file/line info
 ```
 
 ### Memory Safety
 
-- **Bounds checking**: Slice access is bounds-checked
-- **Leak detection**: Debug allocator reports unfreed memory
-- **Caller information**: Track allocation sites automatically
+- **Bounds checking**: Buffer access is bounds-checked
+- **Automatic disposal**: Buffers integrate with `using` statements
+- **Leak detection**: Debug allocator reports unfreed memory with caller info
 - **Type safety**: Generic allocations with compile-time type checking
+- **Span integration**: Seamless conversion to `Span<T>` for safe operations
 
 ## API Reference
 
 ### Core Types
 
-- `Pointer<T>` - Type-safe pointer wrapper
-- `Slice<T>` - Bounds-checked array view  
-- `AutoFree<T>` - RAII wrapper for automatic cleanup
-- `DeferScope` - Manages deferred cleanup actions
-- `Ctx` - Context structure for allocator/I/O passing
+- `UnmanagedBuffer<T>` - Type-safe buffer with automatic cleanup
+- `IUnmanagedMemoryAllocator` - Interface for custom allocators
+- `SystemMemoryAllocator` - High-performance system allocator
+- `ScopedMemoryAllocator` - Arena-style allocator with automatic cleanup
+- `DebugMemoryAllocator` - Leak-detecting wrapper allocator
 
 ### Allocator Interface
 
 ```csharp
-public interface IAllocator
+public interface IUnmanagedMemoryAllocator
 {
-    Pointer<T> Alloc<T>(int count = 1, bool zeroed = false) where T : unmanaged;
-    void Free(IntPtr ptr);
-    Slice<T> Slice<T>(int count, bool zeroed = false) where T : unmanaged;
+    UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged;
+    void Free(IntPtr pointer);
+    bool SupportsIndividualDeallocation { get; }
+    long TotalAllocatedBytes { get; }
 }
+```
+
+### UnmanagedBuffer<T> Key Members
+
+```csharp
+// Properties
+int Length { get; }                    // Number of elements
+int SizeInBytes { get; }              // Total size in bytes
+IntPtr RawPointer { get; }            // Raw pointer for interop
+bool IsEmpty { get; }                 // True if length is 0
+bool IsValid { get; }                 // True if pointer is not null
+
+// Indexing
+ref T this[int index] { get; }        // Bounds-checked element access
+ref T First { get; }                  // Reference to first element
+ref T Last { get; }                   // Reference to last element
+
+// Span conversion
+Span<T> AsSpan()                      // Convert to Span<T>
+ReadOnlySpan<T> AsReadOnlySpan()      // Convert to ReadOnlySpan<T>
+implicit operator Span<T>             // Implicit conversion to Span<T>
+
+// Utility methods
+void Fill(T value)                    // Fill buffer with value
+void Clear()                          // Zero all bytes
+void CopyFrom(ReadOnlySpan<T> source) // Copy from span
+void Dispose()                        // Free memory if owned
 ```
 
 ## Performance
 
 ZiggyAlloc is designed for minimal overhead:
 
-- **Zero-cost abstractions**: ref structs compile to direct memory access
+- **Direct memory access**: UnmanagedBuffer compiles to efficient pointer operations
 - **Inlined operations**: Critical paths are aggressively inlined
 - **Native memory**: Uses `NativeMemory` APIs on .NET 6+ for optimal performance
 - **No GC pressure**: Unmanaged allocations don't affect garbage collection
+- **Zero-copy conversions**: Seamless integration with `Span<T>` without copying
 
 ## Requirements
 
 - .NET 8.0 or later
 - Unsafe code support (automatically enabled by the package)
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-## Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### 🐛 Report Issues
-Found a bug? Have a feature request? [Open an issue](https://github.com/ziggyalloc/ziggyalloc/issues/new/choose) on GitHub.
-
-### 🔧 Contribute Code
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with tests
-4. Submit a pull request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-### 💡 Suggest Improvements
-- Performance optimizations
-- New allocator types
-- API enhancements
-- Documentation improvements
-
-### 🧪 Help with Testing
-- Test on different platforms
-- Performance benchmarking
-- Memory usage analysis
-- Real-world usage scenarios
-
-## Community
-
-- **GitHub Issues**: Bug reports and feature requests
-- **GitHub Discussions**: Questions and general discussion
-- **Pull Requests**: Code contributions welcome!
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Inspiration
-
-This library is inspired by Zig's approach to memory management and context passing. While C# has garbage collection, there are scenarios where explicit memory control is beneficial:
-
-- High-performance applications
-- Interop with native libraries  
-- Memory-constrained environments
-- Deterministic cleanup requirements
-
-ZiggyAlloc brings Zig's elegant patterns to the .NET ecosystem while maintaining C#'s safety and expressiveness.
-## Co
-re API
+## Core API
 
 ### UnmanagedBuffer<T>
 The main type for working with unmanaged memory:
@@ -368,11 +328,51 @@ NativeAPI(buffer.RawPointer, buffer.Length);
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions from the community! Here's how you can help:
+
+### 🐛 Report Issues
+Found a bug? Have a feature request? [Open an issue](https://github.com/ziggyalloc/ziggyalloc/issues/new/choose) on GitHub.
+
+### 🔧 Contribute Code
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Submit a pull request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+### 💡 Suggest Improvements
+- Performance optimizations
+- New allocator types
+- API enhancements
+- Documentation improvements
+
+### 🧪 Help with Testing
+- Test on different platforms
+- Performance benchmarking
+- Memory usage analysis
+- Real-world usage scenarios
+
+## Community
+
+- **GitHub Issues**: Bug reports and feature requests
+- **GitHub Discussions**: Questions and general discussion
+- **Pull Requests**: Code contributions welcome!
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Inspiration
+
+This library is inspired by Zig's approach to memory management and context passing. While C# has garbage collection, there are scenarios where explicit memory control is beneficial:
+
+- High-performance applications
+- Interop with native libraries  
+- Memory-constrained environments
+- Deterministic cleanup requirements
+
+ZiggyAlloc brings Zig's elegant patterns to the .NET ecosystem while maintaining C#'s safety and expressiveness.
 
 ---
 

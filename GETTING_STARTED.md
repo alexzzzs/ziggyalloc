@@ -37,26 +37,25 @@ Replace the contents of `Program.cs`:
 
 ```csharp
 using System;
-using System.Text;
 using ZiggyAlloc;
 
 // Simple example showing core concepts
-using var allocator = new DebugAllocator("MyApp", Z.DefaultAllocator);
-var ctx = new Ctx(allocator, Z.ctx.@out, Z.ctx.@in);
+var allocator = new SystemMemoryAllocator();
 
-using var defer = DeferScope.Start();
+// Allocate a buffer for integers
+using var numbers = allocator.Allocate<int>(5, zeroMemory: true);
 
-// Allocate and format a message
-var message = ctx.FormatToSlice(defer, "Welcome to {0}!", "ZiggyAlloc");
-Console.WriteLine(Encoding.UTF8.GetString(message));
-
-// Create a numeric array
-var numbers = ctx.AllocSlice<int>(defer, 5, zeroed: true);
+// Fill with square numbers
 for (int i = 0; i < numbers.Length; i++)
     numbers[i] = i * i;
 
 // Use implicit conversion to ReadOnlySpan
 PrintNumbers(numbers);
+
+Console.WriteLine($"Buffer info:");
+Console.WriteLine($"  Length: {numbers.Length} elements");
+Console.WriteLine($"  Size: {numbers.SizeInBytes} bytes");
+Console.WriteLine($"  Pointer: 0x{numbers.RawPointer:X}");
 
 static void PrintNumbers(ReadOnlySpan<int> nums)
 {
@@ -73,8 +72,11 @@ dotnet run
 
 Expected output:
 ```
-Welcome to ZiggyAlloc!
 Numbers: 0 1 4 9 16
+Buffer info:
+  Length: 5 elements
+  Size: 20 bytes
+  Pointer: 0x1A2B3C4D5E6F
 ```
 
 ## Key Concepts
@@ -83,89 +85,130 @@ Numbers: 0 1 4 9 16
 Choose the right allocator for your needs:
 
 ```csharp
-// Manual control - you manage memory
-var manual = new ManualAllocator();
+// System allocator - high performance, manual memory management
+var system = new SystemMemoryAllocator();
 
-// Automatic cleanup on scope exit
-using var scoped = new ScopedAllocator();
+// Scoped allocator - automatic cleanup on scope exit
+using var scoped = new ScopedMemoryAllocator();
 
-// Debug mode with leak detection
-using var debug = new DebugAllocator("Component", Z.DefaultAllocator);
+// Debug allocator - leak detection with caller information
+using var debug = new DebugMemoryAllocator("Component", Z.DefaultAllocator);
 ```
 
-### 2. Context Pattern
-Pass allocators through your application:
+### 2. UnmanagedBuffer<T>
+The core type for working with unmanaged memory:
 
 ```csharp
-void ProcessData(Ctx ctx)
+using var buffer = allocator.Allocate<int>(100);
+
+// Array-like access with bounds checking
+buffer[0] = 42;
+int value = buffer[99];
+
+// Convert to Span<T> for high-performance operations
+Span<int> span = buffer;
+span.Fill(123);
+
+// Access raw pointer for native interop
+IntPtr ptr = buffer.RawPointer;
+```
+
+### 3. Automatic Memory Management
+Use `using` statements for deterministic cleanup:
+
+```csharp
+using var buffer1 = allocator.Allocate<byte>(1024);
+using var buffer2 = allocator.Allocate<double>(500);
+
+// Both buffers automatically freed when they go out of scope
+// No manual Free() calls needed
+```
+
+### 4. Memory Safety Features
+Built-in safety without performance cost:
+
+```csharp
+using var buffer = allocator.Allocate<int>(10);
+
+// Bounds checking prevents buffer overruns
+try 
 {
-    var buffer = ctx.AllocSlice<byte>(1024);
-    // Use buffer...
-    // Memory management handled by caller's allocator choice
+    buffer[15] = 42; // Throws IndexOutOfRangeException
 }
-```
-
-### 3. Defer Scopes
-Automatic cleanup with deterministic ordering:
-
-```csharp
-using var defer = DeferScope.Start();
-
-var ptr1 = ctx.Alloc<int>(defer);
-var ptr2 = ctx.Alloc<double>(defer);
-
-defer.Defer(() => Console.WriteLine("Custom cleanup"));
-// Cleanup order: custom action, ptr2, ptr1
-```
-
-### 4. RAII Pattern
-Automatic resource management:
-
-```csharp
-using (var auto = ctx.Auto<MyStruct>())
+catch (IndexOutOfRangeException)
 {
-    auto.Value = new MyStruct { Field = 42 };
-    // Use auto.Value...
-} // Automatically freed here
+    Console.WriteLine("Index out of bounds caught!");
+}
+
+// Safe span conversion for high-performance operations
+Span<int> span = buffer; // No copying, direct memory access
 ```
 
 ## Common Patterns
 
 ### Working with Native APIs
 ```csharp
-// Prepare data for native interop
-var points = ctx.AllocSlice<Point3D>(defer, 1000);
-// Fill points...
+var allocator = new SystemMemoryAllocator();
+using var points = allocator.Allocate<Point3D>(1000);
 
-// Pass to native function
-NativeApi.ProcessPoints(points.Ptr.Raw, points.Length);
+// Fill with data
+for (int i = 0; i < points.Length; i++)
+{
+    points[i] = new Point3D { X = i, Y = i * 2, Z = i * 3 };
+}
+
+// Pass raw pointer to native function
+NativeApi.ProcessPoints(points.RawPointer, points.Length);
 ```
 
 ### High-Performance Buffers
 ```csharp
-// Large buffer with zero-cost span access
-var buffer = ctx.AllocSlice<byte>(1024 * 1024, zeroed: true);
-Span<byte> span = buffer; // Zero-cost conversion
+var allocator = new SystemMemoryAllocator();
+using var buffer = allocator.Allocate<byte>(1024 * 1024, zeroMemory: true);
+
+// Zero-cost conversion to Span<T>
+Span<byte> span = buffer;
 
 // Fast operations using span
 span.Fill(0xFF);
+
+// Check memory usage
+Console.WriteLine($"Allocated: {allocator.TotalAllocatedBytes} bytes");
 ```
 
 ### Memory Leak Detection
 ```csharp
-using var debug = new DebugAllocator("Test", Z.DefaultAllocator, LeakReportingMode.Throw);
+using var debug = new DebugMemoryAllocator("Test", Z.DefaultAllocator, 
+    MemoryLeakReportingMode.Throw);
 
-var ptr = debug.Alloc<int>();
-// Forgot to free - will throw exception with file/line info
+using var buffer1 = debug.Allocate<int>(10); // Properly disposed
+
+var buffer2 = debug.Allocate<int>(5);
+// Forgot to dispose buffer2 - will throw exception with file/line info when debug allocator is disposed
+```
+
+### Scoped Memory Management
+```csharp
+using var scopedAllocator = new ScopedMemoryAllocator();
+
+// Multiple allocations that will all be freed together
+using var buffer1 = scopedAllocator.Allocate<int>(100);
+using var buffer2 = scopedAllocator.Allocate<double>(200);
+using var buffer3 = scopedAllocator.Allocate<byte>(1000);
+
+// All memory freed when scopedAllocator is disposed
 ```
 
 ## Best Practices
 
-1. **Use appropriate allocators**: Debug for development, Manual/Scoped for production
-2. **Prefer defer scopes**: Automatic cleanup with clear ordering
-3. **Leverage context pattern**: Pass allocators through your API
-4. **Use RAII when possible**: `using` statements for automatic cleanup
-5. **Check for leaks**: Always use DebugAllocator during development
+1. **Use appropriate allocators**: 
+   - `SystemMemoryAllocator` for general use
+   - `ScopedMemoryAllocator` for temporary allocations
+   - `DebugMemoryAllocator` during development
+2. **Always use `using` statements**: Ensures deterministic cleanup
+3. **Leverage Span<T> conversion**: Get high performance without copying
+4. **Check for leaks**: Use `DebugMemoryAllocator` during development
+5. **Monitor memory usage**: Use `TotalAllocatedBytes` for tracking
 
 ## Next Steps
 

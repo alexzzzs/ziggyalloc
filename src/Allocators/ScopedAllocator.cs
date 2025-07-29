@@ -14,29 +14,42 @@ namespace ZiggyAlloc
     /// 
     /// This allocator is NOT thread-safe. Use separate instances for different threads.
     /// </remarks>
-    public sealed class ScopedMemoryAllocator : IMemoryAllocator, IDisposable
+    public sealed class ScopedMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
-        private readonly ManualMemoryAllocator _backingAllocator = new();
+        private readonly SystemMemoryAllocator _backingAllocator = new();
         private readonly List<IntPtr> _allocatedPointers = new();
         private bool _disposed = false;
 
         /// <summary>
-        /// Allocates memory for one or more instances of the specified unmanaged type.
+        /// Gets a value indicating whether this allocator supports individual memory deallocation.
+        /// </summary>
+        /// <remarks>
+        /// Scoped allocators do not support individual deallocation - all memory is freed when disposed.
+        /// </remarks>
+        public bool SupportsIndividualDeallocation => false;
+
+        /// <summary>
+        /// Gets the total number of bytes currently allocated by this allocator.
+        /// </summary>
+        public long TotalAllocatedBytes => _backingAllocator.TotalAllocatedBytes;
+
+        /// <summary>
+        /// Allocates unmanaged memory for the specified number of elements.
         /// </summary>
         /// <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
-        /// <param name="count">The number of instances to allocate space for</param>
-        /// <param name="zeroed">Whether to zero-initialize the allocated memory</param>
-        /// <returns>A pointer to the allocated memory</returns>
+        /// <param name="elementCount">The number of elements to allocate space for</param>
+        /// <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
+        /// <returns>A buffer representing the allocated memory</returns>
         /// <exception cref="OutOfMemoryException">Thrown when memory allocation fails</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when count is less than 1</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when elementCount is less than 0</exception>
         /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
-        public Pointer<T> Allocate<T>(int count = 1, bool zeroed = false) where T : unmanaged
+        public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
             ThrowIfDisposed();
             
-            var pointer = _backingAllocator.Allocate<T>(count, zeroed);
-            _allocatedPointers.Add(pointer.Raw);
-            return pointer;
+            var buffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
+            _allocatedPointers.Add(buffer.RawPointer);
+            return buffer;
         }
 
         /// <summary>
@@ -49,29 +62,6 @@ namespace ZiggyAlloc
             throw new NotSupportedException(
                 "Individual memory deallocation is not supported in ScopedMemoryAllocator. " +
                 "All memory is automatically freed when the allocator is disposed.");
-
-        /// <summary>
-        /// Allocates memory for a slice (array) of the specified unmanaged type.
-        /// </summary>
-        /// <typeparam name="T">The unmanaged type to allocate memory for</typeparam>
-        /// <param name="count">The number of elements in the slice</param>
-        /// <param name="zeroed">Whether to zero-initialize the allocated memory</param>
-        /// <returns>A slice representing the allocated memory</returns>
-        /// <exception cref="OutOfMemoryException">Thrown when memory allocation fails</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when count is less than 0</exception>
-        /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
-        public Slice<T> AllocateSlice<T>(int count, bool zeroed = false) where T : unmanaged
-        {
-            ThrowIfDisposed();
-            
-            if (count < 0)
-                throw new ArgumentOutOfRangeException(nameof(count), "Count cannot be negative");
-
-            if (count == 0)
-                return new Slice<T>(new Pointer<T>(IntPtr.Zero), 0);
-
-            return new Slice<T>(Allocate<T>(count, zeroed), count);
-        }
 
         /// <summary>
         /// Frees all allocated memory and disposes the allocator.

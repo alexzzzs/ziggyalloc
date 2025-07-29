@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using ZiggyAlloc;
 
 namespace ZiggyAlloc.Examples
@@ -28,26 +27,28 @@ namespace ZiggyAlloc.Examples
             Console.WriteLine("1. Allocator Types Demo");
             Console.WriteLine("----------------------");
 
-            // Manual allocator - explicit control
-            Console.WriteLine("Manual Allocator:");
-            var manual = new ManualMemoryAllocator();
-            var ptr = manual.Allocate<int>(10);
-            for (int i = 0; i < 10; i++) ptr[i] = i * i;
-            Console.WriteLine($"Allocated array, first few values: {ptr[0]}, {ptr[1]}, {ptr[2]}");
-            manual.Free(ptr.Raw);
-            Console.WriteLine("Manually freed\n");
+            // System allocator - direct control
+            Console.WriteLine("System Memory Allocator:");
+            var allocator = new SystemMemoryAllocator();
+            using var buffer = allocator.Allocate<int>(10, zeroMemory: true);
+            
+            for (int i = 0; i < buffer.Length; i++) 
+                buffer[i] = i * i;
+            
+            Console.WriteLine($"Allocated array, first few values: {buffer[0]}, {buffer[1]}, {buffer[2]}");
+            Console.WriteLine("Memory freed automatically with 'using'\n");
 
             // Scoped allocator - automatic cleanup
             Console.WriteLine("Scoped Allocator:");
             using (var scoped = new ScopedMemoryAllocator())
             {
-                var slice1 = scoped.AllocateSlice<double>(5, zeroed: true);
-                var slice2 = scoped.AllocateSlice<byte>(100);
+                using var buffer1 = scoped.Allocate<double>(5, zeroMemory: true);
+                using var buffer2 = scoped.Allocate<byte>(100, zeroMemory: false);
                 
-                slice1[0] = 3.14159;
-                slice2[0] = 0xFF;
+                buffer1[0] = 3.14159;
+                buffer2[0] = 0xFF;
                 
-                Console.WriteLine($"Allocated multiple arrays: double[0]={slice1[0]}, byte[0]={slice2[0]:X2}");
+                Console.WriteLine($"Allocated multiple arrays: double[0]={buffer1[0]}, byte[0]={buffer2[0]:X2}");
                 Console.WriteLine("Will auto-free on scope exit");
             }
             Console.WriteLine("Scoped allocator disposed, all memory freed\n");
@@ -60,15 +61,15 @@ namespace ZiggyAlloc.Examples
 
             try
             {
-                using var debugAlloc = new DebugMemoryAllocator("LeakTest", ZiggyAllocDefaults.DefaultAllocator, MemoryLeakReportingMode.Throw);
+                using var debugAlloc = new DebugMemoryAllocator("LeakTest", Z.DefaultAllocator, MemoryLeakReportingMode.Throw);
                 
-                var ptr1 = debugAlloc.Allocate<int>();
-                ptr1.Value = 42;
-                debugAlloc.Free(ptr1.Raw); // Properly freed
+                using var buffer1 = debugAlloc.Allocate<int>(1);
+                buffer1[0] = 42;
+                // This buffer is properly disposed
                 
-                var ptr2 = debugAlloc.Allocate<double>(5);
-                ptr2[0] = 1.23;
-                // Intentionally not freeing ptr2 to demonstrate leak detection
+                var buffer2 = debugAlloc.Allocate<double>(5);
+                buffer2[0] = 1.23;
+                // Intentionally not disposing buffer2 to demonstrate leak detection
                 
                 Console.WriteLine("Created allocations, one will leak...");
             }
@@ -84,15 +85,14 @@ namespace ZiggyAlloc.Examples
             Console.WriteLine("3. High-Performance Buffer Operations");
             Console.WriteLine("------------------------------------");
 
-            using var allocator = new ScopedMemoryAllocator();
-            var context = new AllocationContext(allocator, ZiggyAllocDefaults.DefaultContext.Output, ZiggyAllocDefaults.DefaultContext.Input);
+            var allocator = new SystemMemoryAllocator();
 
             // Large buffer allocation
             const int bufferSize = 1024 * 1024; // 1MB
-            var buffer = context.AllocateSlice<byte>(bufferSize, zeroed: true);
+            using var buffer = allocator.Allocate<byte>(bufferSize, zeroMemory: true);
             
             // Fast memory operations using Span<T>
-            var span = buffer.AsSpan();
+            Span<byte> span = buffer;
             
             // Fill with pattern
             for (int i = 0; i < span.Length; i += 4)
@@ -108,6 +108,7 @@ namespace ZiggyAlloc.Examples
 
             Console.WriteLine($"Filled {bufferSize:N0} byte buffer with pattern");
             Console.WriteLine($"First 8 bytes: {span[0]:X2} {span[1]:X2} {span[2]:X2} {span[3]:X2} {span[4]:X2} {span[5]:X2} {span[6]:X2} {span[7]:X2}");
+            Console.WriteLine($"Total allocated: {allocator.TotalAllocatedBytes / (1024 * 1024)}MB");
             Console.WriteLine();
         }
 
@@ -116,11 +117,10 @@ namespace ZiggyAlloc.Examples
             Console.WriteLine("4. Interop Scenarios");
             Console.WriteLine("-------------------");
 
-            using var defer = DeferredCleanupScope.Create();
-            var context = ZiggyAllocDefaults.DefaultContext;
+            var allocator = new SystemMemoryAllocator();
 
             // Simulate preparing data for native API call
-            var structArray = context.AllocateSliceDeferred<Point3D>(defer, 1000, zeroed: true);
+            using var structArray = allocator.Allocate<Point3D>(1000, zeroMemory: true);
             
             // Fill with sample data
             for (int i = 0; i < structArray.Length; i++)
@@ -134,15 +134,16 @@ namespace ZiggyAlloc.Examples
             }
 
             // Get raw pointer for native interop
-            var rawPtr = structArray.Ptr.Raw;
+            var rawPtr = structArray.RawPointer;
             Console.WriteLine($"Prepared {structArray.Length} Point3D structs for native API");
             Console.WriteLine($"Raw pointer: 0x{rawPtr:X}");
             Console.WriteLine($"Sample point: ({structArray[100].X:F1}, {structArray[100].Y:F1}, {structArray[100].Z:F1})");
+            Console.WriteLine($"Buffer size: {structArray.SizeInBytes} bytes");
             
             // In real scenario, you'd pass rawPtr to native function
             // SimulateNativeApiCall(rawPtr, structArray.Length);
             
-            Console.WriteLine("Memory will be automatically freed by defer scope");
+            Console.WriteLine("Memory will be automatically freed when buffer is disposed");
         }
 
         // Example struct for interop

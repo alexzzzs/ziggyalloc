@@ -5,78 +5,89 @@
 1. [Overview](#overview)
 2. [Core Concepts](#core-concepts)
 3. [Memory Allocators](#memory-allocators)
-4. [Memory Types](#memory-types)
-5. [Context System](#context-system)
-6. [Lifetime Management](#lifetime-management)
-7. [API Reference](#api-reference)
-8. [Best Practices](#best-practices)
-9. [Performance Considerations](#performance-considerations)
-10. [Common Patterns](#common-patterns)
+4. [UnmanagedBuffer<T>](#unmanagedbuffert)
+5. [Memory Safety](#memory-safety)
+6. [API Reference](#api-reference)
+7. [Best Practices](#best-practices)
+8. [Performance Considerations](#performance-considerations)
+9. [Common Patterns](#common-patterns)
 
 ## Overview
 
-ZiggyAlloc is a C# library inspired by Zig's approach to memory management and context passing. It provides explicit control over memory allocation while maintaining safety through well-designed abstractions.
+ZiggyAlloc is a high-performance C# library for unmanaged memory management. It provides explicit control over memory allocation while maintaining safety through well-designed abstractions and automatic cleanup mechanisms.
 
 ### Key Features
 
-- **Explicit Memory Management**: Direct control over allocation and deallocation
-- **Multiple Allocator Strategies**: Manual, scoped, and debug allocators
-- **Zig-style Context Pattern**: Pass allocators and I/O through application layers
-- **Memory Safety**: Bounds checking, leak detection, and caller information tracking
-- **RAII Support**: Automatic cleanup using `using` statements and defer scopes
-- **Zero-cost Abstractions**: High-performance ref structs with minimal overhead
+- **High-Performance Memory Management**: Direct access to native memory allocation
+- **Multiple Allocator Strategies**: System, scoped, and debug allocators
+- **Type-Safe Memory Access**: `UnmanagedBuffer<T>` with bounds checking
+- **Memory Safety**: Leak detection, bounds checking, and automatic cleanup
+- **RAII Support**: Automatic cleanup using `using` statements
+- **Span<T> Integration**: Zero-cost conversion to high-performance spans
+- **Native Interop**: Direct pointer access for native API calls
 
 ## Core Concepts
 
 ### Memory Allocators
 
-All memory allocation in ZiggyAlloc goes through implementations of `IMemoryAllocator`:
+All memory allocation in ZiggyAlloc goes through implementations of `IUnmanagedMemoryAllocator`:
 
 ```csharp
-public interface IMemoryAllocator
+public interface IUnmanagedMemoryAllocator
 {
-    Pointer<T> Allocate<T>(int count = 1, bool zeroed = false) where T : unmanaged;
+    UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged;
     void Free(IntPtr pointer);
-    Slice<T> AllocateSlice<T>(int count, bool zeroed = false) where T : unmanaged;
+    bool SupportsIndividualDeallocation { get; }
+    long TotalAllocatedBytes { get; }
 }
 ```
 
-### Context Pattern
+### UnmanagedBuffer<T>
 
-ZiggyAlloc uses Zig's context pattern to pass related functionality together:
+The core type for working with unmanaged memory:
 
 ```csharp
-var context = new AllocationContext(allocator, output, input);
-// Pass context through your application
-ProcessData(context);
+var allocator = new SystemMemoryAllocator();
+using var buffer = allocator.Allocate<int>(100);
+
+// Type-safe access with bounds checking
+buffer[0] = 42;
+int value = buffer[99];
+
+// Convert to Span<T> for high-performance operations
+Span<int> span = buffer;
+span.Fill(123);
 ```
 
-### Explicit Lifetime Management
+### Automatic Memory Management
 
-Unlike garbage-collected memory, ZiggyAlloc requires explicit lifetime management:
+ZiggyAlloc uses RAII principles for deterministic cleanup:
 
-- **Manual**: Explicit `Allocate()` and `Free()` calls
-- **RAII**: Automatic cleanup with `using` statements
-- **Deferred**: Cleanup actions executed at scope end
-- **Scoped**: All allocations freed when allocator is disposed
+- **Using statements**: Automatic cleanup when buffers go out of scope
+- **Scoped allocators**: All allocations freed when allocator is disposed
+- **Debug tracking**: Leak detection with caller information
 
 ## Memory Allocators
 
-### ManualMemoryAllocator
+### SystemMemoryAllocator
 
-Direct control over memory allocation and deallocation.
+High-performance allocator using native system calls.
 
 ```csharp
-var allocator = new ManualMemoryAllocator();
-var ptr = allocator.Allocate<int>();
-ptr.Value = 42;
-allocator.Free(ptr.Raw); // Must free explicitly
+var allocator = new SystemMemoryAllocator();
+using var buffer = allocator.Allocate<int>(100, zeroMemory: true);
+
+// Use buffer...
+// Memory automatically freed when buffer is disposed
+
+Console.WriteLine($"Total allocated: {allocator.TotalAllocatedBytes} bytes");
 ```
 
 **Use Cases:**
+- General-purpose unmanaged memory allocation
 - Performance-critical code
 - Long-lived allocations
-- When you need precise control over memory lifetime
+- Native API interop
 
 **Thread Safety:** ✅ Thread-safe
 
@@ -86,15 +97,16 @@ Automatically frees all allocations when disposed.
 
 ```csharp
 using var allocator = new ScopedMemoryAllocator();
-var ptr1 = allocator.Allocate<int>();
-var ptr2 = allocator.Allocate<double>(10);
-// All memory freed automatically on dispose
+using var buffer1 = allocator.Allocate<int>(50);
+using var buffer2 = allocator.Allocate<double>(100);
+
+// All memory freed automatically when allocator is disposed
 ```
 
 **Use Cases:**
 - Temporary allocations within a scope
 - Arena-style allocation patterns
-- When you want automatic cleanup
+- When you want automatic cleanup of multiple allocations
 
 **Thread Safety:** ❌ Not thread-safe (use separate instances per thread)
 
@@ -104,10 +116,12 @@ Tracks allocations and detects memory leaks with caller information.
 
 ```csharp
 using var debugAlloc = new DebugMemoryAllocator("MyComponent", 
-    new ManualMemoryAllocator(), MemoryLeakReportingMode.Throw);
+    Z.DefaultAllocator, MemoryLeakReportingMode.Throw);
 
-var ptr = debugAlloc.Allocate<int>();
-// Forgot to free - will report leak with file/line info on dispose
+using var buffer1 = debugAlloc.Allocate<int>(10); // Properly disposed
+
+var buffer2 = debugAlloc.Allocate<int>(5);
+// Forgot to dispose buffer2 - will report leak with file/line info
 ```
 
 **Use Cases:**
@@ -117,237 +131,296 @@ var ptr = debugAlloc.Allocate<int>();
 
 **Thread Safety:** ✅ Thread-safe
 
-## Memory Types
+## UnmanagedBuffer<T>
 
-### Pointer<T>
-
-A type-safe wrapper around an unmanaged pointer.
+The core type for working with unmanaged memory in ZiggyAlloc.
 
 ```csharp
-var ptr = allocator.Allocate<int>(5);
-ptr.Value = 42;           // Access first element
-ptr[2] = 100;            // Access by index
-var span = ptr.AsSpan(5); // Convert to Span<T>
+var allocator = new SystemMemoryAllocator();
+using var buffer = allocator.Allocate<int>(100, zeroMemory: true);
+
+// Array-like access with bounds checking
+buffer[0] = 42;
+buffer[99] = 100;
+
+// Properties
+Console.WriteLine($"Length: {buffer.Length}");
+Console.WriteLine($"Size: {buffer.SizeInBytes} bytes");
+Console.WriteLine($"Pointer: 0x{buffer.RawPointer:X}");
+
+// Span conversion for high-performance operations
+Span<int> span = buffer;
+span.Fill(123);
+
+// Utility methods
+buffer.Clear();           // Zero all bytes
+buffer.Fill(42);          // Fill with value
+buffer.CopyFrom(source);  // Copy from another buffer/span
 ```
 
 **Key Features:**
-- Bounds checking for indexed access
-- Type safety at compile time
-- Conversion to `Span<T>` for interop
-- No implicit conversions to prevent errors
+- **Bounds checking**: Prevents buffer overruns and underruns
+- **Type safety**: Compile-time type checking for unmanaged types
+- **Span integration**: Zero-cost conversion to `Span<T>` and `ReadOnlySpan<T>`
+- **Automatic cleanup**: Integrates with `using` statements
+- **Native interop**: Direct pointer access for native API calls
+- **Memory utilities**: Built-in methods for common operations
 
-### Slice<T>
+**Properties:**
+- `int Length` - Number of elements in the buffer
+- `int SizeInBytes` - Total size in bytes
+- `IntPtr RawPointer` - Raw pointer for native interop
+- `bool IsEmpty` - True if length is 0
+- `bool IsValid` - True if pointer is not null
+- `ref T First` - Reference to first element
+- `ref T Last` - Reference to last element
 
-A bounds-checked view over allocated memory.
+**Methods:**
+- `ref T this[int index]` - Bounds-checked element access
+- `Span<T> AsSpan()` - Convert to Span<T>
+- `ReadOnlySpan<T> AsReadOnlySpan()` - Convert to ReadOnlySpan<T>
+- `void Fill(T value)` - Fill buffer with value
+- `void Clear()` - Zero all bytes
+- `void CopyFrom(ReadOnlySpan<T> source)` - Copy from span
+- `void Dispose()` - Free memory if owned
 
-```csharp
-var slice = allocator.AllocateSlice<int>(10);
-slice[0] = 42;                    // Bounds-checked access
-Span<int> span = slice;           // Implicit conversion
-ReadOnlySpan<int> roSpan = slice; // Implicit conversion
-```
+## Memory Safety
 
-**Key Features:**
-- Automatic bounds checking
-- Implicit conversion to `Span<T>` and `ReadOnlySpan<T>`
-- Length property for safe iteration
-- Integration with .NET's span-based APIs
+ZiggyAlloc provides multiple layers of memory safety without sacrificing performance:
 
-## Context System
+### Bounds Checking
 
-### AllocationContext
-
-Combines memory allocation with I/O operations following Zig's context pattern.
-
-```csharp
-var context = new AllocationContext(
-    new ManualMemoryAllocator(),
-    new ConsoleOutputWriter(),
-    new ConsoleInputReader()
-);
-
-// Memory operations
-var data = context.AllocateSlice<byte>(1024);
-
-// I/O operations
-context.WriteLine("Processing data...");
-var input = context.ReadLine();
-
-// Combined operations
-var formatted = context.FormatToSliceDeferred(defer, "Result: {0}", result);
-```
-
-**Benefits:**
-- Explicit dependency injection
-- Easy testing with mock implementations
-- Consistent API across different scenarios
-- Reduced parameter passing
-
-### I/O Abstractions
+All buffer access is bounds-checked to prevent buffer overruns:
 
 ```csharp
-public interface IOutputWriter
+using var buffer = allocator.Allocate<int>(10);
+
+try 
 {
-    void Write(string text);
-    void Write(char character);
-    void WriteLine();
-    void WriteLine<T>(T value);
+    buffer[15] = 42; // Throws IndexOutOfRangeException
 }
-
-public interface IInputReader
+catch (IndexOutOfRangeException ex)
 {
-    string? ReadLine();
-    int Read();
+    Console.WriteLine($"Bounds check prevented buffer overrun: {ex.Message}");
 }
 ```
 
-## Lifetime Management
+### Automatic Cleanup
 
-### RAII with AutoFreeMemory<T>
-
-Automatic cleanup using the `using` statement:
+Buffers integrate with `using` statements for deterministic cleanup:
 
 ```csharp
-using var auto = context.AllocateAuto<MyStruct>();
-auto.Value = new MyStruct { Field = 42 };
-// Memory automatically freed when 'auto' goes out of scope
+using var buffer = allocator.Allocate<byte>(1024);
+// Memory automatically freed when buffer goes out of scope
+// No manual Free() calls needed
 ```
 
-### Deferred Cleanup
+### Leak Detection
 
-Zig-style defer pattern for deterministic cleanup:
+Debug allocator tracks allocations and reports leaks with caller information:
 
 ```csharp
-using var defer = DeferredCleanupScope.Create();
+using var debugAlloc = new DebugMemoryAllocator("Test", Z.DefaultAllocator, 
+    MemoryLeakReportingMode.Throw);
 
-var ptr1 = context.AllocateDeferred<int>(defer);
-var ptr2 = context.AllocateDeferred<double>(defer, 10);
+var buffer = debugAlloc.Allocate<int>(10);
+// Forgot to dispose - will throw with file/line information
+```
 
-defer.DeferAction(() => Console.WriteLine("Custom cleanup"));
-// Cleanup order: custom action, ptr2, ptr1 (LIFO)
+### Type Safety
+
+Generic constraints ensure only unmanaged types can be allocated:
+
+```csharp
+// ✅ Valid - int is unmanaged
+using var intBuffer = allocator.Allocate<int>(100);
+
+// ❌ Compile error - string is managed
+// using var stringBuffer = allocator.Allocate<string>(100);
 ```
 
 ## API Reference
 
-### Core Types
+### IUnmanagedMemoryAllocator Interface
 
-#### `IMemoryAllocator`
-- `Pointer<T> Allocate<T>(int count = 1, bool zeroed = false)`
-- `void Free(IntPtr pointer)`
-- `Slice<T> AllocateSlice<T>(int count, bool zeroed = false)`
+```csharp
+public interface IUnmanagedMemoryAllocator
+{
+    // Allocate memory for elements
+    UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged;
+    
+    // Free previously allocated memory
+    void Free(IntPtr pointer);
+    
+    // Whether individual deallocation is supported
+    bool SupportsIndividualDeallocation { get; }
+    
+    // Total bytes currently allocated
+    long TotalAllocatedBytes { get; }
+}
+```
 
-#### `AllocationContext`
-- Memory: `Allocate<T>()`, `AllocateSlice<T>()`, `AllocateAuto<T>()`
-- I/O: `Write()`, `WriteLine()`, `ReadLine()`, `ReadCharacter()`
-- Deferred: `AllocateDeferred<T>()`, `FormatToSliceDeferred()`
+### SystemMemoryAllocator
 
-#### `Pointer<T>`
-- `ref T Value` - Reference to the pointed value
-- `ref T this[int index]` - Indexed access
-- `Span<T> AsSpan(int count)` - Convert to span
-- `IntPtr Raw` - Raw pointer value
-- `bool IsNull` - Check for null pointer
+```csharp
+public sealed class SystemMemoryAllocator : IUnmanagedMemoryAllocator
+{
+    // Allocate memory using native system calls
+    public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false);
+    
+    // Free memory
+    public void Free(IntPtr pointer);
+    
+    // Properties
+    public bool SupportsIndividualDeallocation => true;
+    public long TotalAllocatedBytes { get; }
+    
+    // Static utility methods
+    public static UnmanagedBuffer<T> WrapExisting<T>(IntPtr pointer, int elementCount);
+    public static UnmanagedBuffer<T> WrapSpan<T>(Span<T> span);
+}
+```
 
-#### `Slice<T>`
-- `ref T this[int index]` - Bounds-checked indexed access
-- `int Length` - Number of elements
-- `Span<T> AsSpan()` - Convert to span
-- `bool IsEmpty` - Check if empty
-- Implicit conversions to `Span<T>` and `ReadOnlySpan<T>`
+### ScopedMemoryAllocator
 
-### Allocator Implementations
+```csharp
+public sealed class ScopedMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
+{
+    // Allocate memory (freed when allocator is disposed)
+    public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false);
+    
+    // Individual deallocation not supported
+    public void Free(IntPtr pointer); // Throws NotSupportedException
+    
+    // Properties
+    public bool SupportsIndividualDeallocation => false;
+    public long TotalAllocatedBytes { get; }
+    
+    // Dispose frees all allocations
+    public void Dispose();
+}
+```
 
-#### `ManualMemoryAllocator`
-- Direct memory control
-- Thread-safe
-- Requires explicit `Free()` calls
+### DebugMemoryAllocator
 
-#### `ScopedMemoryAllocator`
-- Automatic cleanup on dispose
-- Not thread-safe
-- Cannot free individual allocations
+```csharp
+public sealed class DebugMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
+{
+    // Constructor
+    public DebugMemoryAllocator(string name, IUnmanagedMemoryAllocator backingAllocator, 
+        MemoryLeakReportingMode reportingMode = MemoryLeakReportingMode.Log);
+    
+    // Allocate with caller tracking
+    public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false);
+    
+    // Free with tracking removal
+    public void Free(IntPtr pointer);
+    
+    // Properties
+    public bool SupportsIndividualDeallocation { get; }
+    public long TotalAllocatedBytes { get; }
+    
+    // Leak detection
+    public void ReportMemoryLeaks();
+    public int GetTrackedAllocationCount();
+    public void Dispose(); // Reports leaks
+}
+```
 
-#### `DebugMemoryAllocator`
-- Leak detection with caller info
-- Thread-safe
-- Configurable reporting modes
+### Z Static Class
 
-### Lifetime Management
+```csharp
+public static class Z
+{
+    // Default allocator instance
+    public static readonly SystemMemoryAllocator DefaultAllocator;
+}
+```
 
-#### `AutoFreeMemory<T>`
-- RAII-style automatic cleanup
-- Ref struct (stack-only)
-- Use with `using` statements
 
-#### `DeferredCleanupScope`
-- Zig-style defer pattern
-- LIFO cleanup order
-- Exception-safe cleanup
 
 ## Best Practices
 
 ### 1. Choose the Right Allocator
 
 ```csharp
-// For performance-critical, long-lived allocations
-var manual = new ManualMemoryAllocator();
+// For general-purpose, high-performance allocations
+var system = new SystemMemoryAllocator();
 
 // For temporary allocations within a scope
 using var scoped = new ScopedMemoryAllocator();
 
 // For development and debugging
-using var debug = new DebugMemoryAllocator("Component", manual);
+using var debug = new DebugMemoryAllocator("Component", Z.DefaultAllocator);
 ```
 
-### 2. Use RAII When Possible
+### 2. Always Use `using` Statements
 
 ```csharp
-// Preferred: Automatic cleanup
-using var data = context.AllocateAuto<MyStruct>();
+// ✅ Preferred: Automatic cleanup
+using var buffer = allocator.Allocate<int>(100);
 
-// Avoid: Manual cleanup (error-prone)
-var ptr = context.Allocate<MyStruct>();
-// ... easy to forget Free()
+// ❌ Avoid: Manual cleanup (error-prone)
+var buffer = allocator.Allocate<int>(100);
+// ... easy to forget Dispose()
 ```
 
-### 3. Leverage Defer Scopes
+### 3. Leverage Span<T> for Performance
 
 ```csharp
-using var defer = DeferredCleanupScope.Create();
+using var buffer = allocator.Allocate<int>(1000);
 
-var resource1 = AcquireResource1(defer);
-var resource2 = AcquireResource2(defer);
-// Resources freed in reverse order automatically
+// Zero-cost conversion to Span<T>
+Span<int> span = buffer;
+
+// Use span for high-performance operations
+span.Fill(42);
+span.Sort();
 ```
 
-### 4. Use Context Pattern
+### 4. Use Bounds Checking Wisely
 
 ```csharp
-// Pass context through your application
-void ProcessData(AllocationContext context)
+using var buffer = allocator.Allocate<int>(100);
+
+// Bounds checking for safety
+for (int i = 0; i < buffer.Length; i++)
 {
-    var buffer = context.AllocateSlice<byte>(1024);
-    context.WriteLine("Processing...");
-    // Context provides both memory and I/O
+    buffer[i] = i * i;
+}
+
+// Or use spans for bulk operations
+Span<int> span = buffer;
+for (int i = 0; i < span.Length; i++)
+{
+    span[i] = i * i;
 }
 ```
 
-### 5. Handle Errors Properly
+### 5. Handle Allocation Failures
 
 ```csharp
 try
 {
-    var ptr = allocator.Allocate<LargeStruct>(1000000);
-    // Use ptr...
+    using var buffer = allocator.Allocate<LargeStruct>(1_000_000);
+    // Use buffer...
 }
-catch (OutOfMemoryException)
+catch (OutOfMemoryException ex)
 {
-    // Handle allocation failure
+    Console.WriteLine($"Allocation failed: {ex.Message}");
+    // Handle gracefully
 }
-finally
-{
-    // Ensure cleanup in error cases
-}
+```
+
+### 6. Monitor Memory Usage
+
+```csharp
+var allocator = new SystemMemoryAllocator();
+
+using var buffer1 = allocator.Allocate<byte>(1024 * 1024); // 1MB
+using var buffer2 = allocator.Allocate<int>(100_000);      // 400KB
+
+Console.WriteLine($"Total allocated: {allocator.TotalAllocatedBytes:N0} bytes");
 ```
 
 ## Performance Considerations

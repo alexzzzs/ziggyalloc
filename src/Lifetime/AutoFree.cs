@@ -15,16 +15,16 @@ namespace ZiggyAlloc
     /// </remarks>
     public readonly ref struct AutoFreeMemory<T> : IDisposable where T : unmanaged
     {
-        private readonly IMemoryAllocator _allocator;
+        private readonly IUnmanagedMemoryAllocator _allocator;
 
         /// <summary>
-        /// Gets the pointer to the allocated memory.
+        /// Gets the buffer representing the allocated memory.
         /// </summary>
         /// <remarks>
-        /// This pointer remains valid until the AutoFreeMemory instance is disposed.
-        /// Do not use this pointer after disposal as it will point to freed memory.
+        /// This buffer remains valid until the AutoFreeMemory instance is disposed.
+        /// Do not use this buffer after disposal as it will point to freed memory.
         /// </remarks>
-        public readonly Pointer<T> Pointer { get; }
+        public readonly UnmanagedBuffer<T> Buffer { get; }
 
         /// <summary>
         /// Gets a reference to the value at the allocated memory location.
@@ -34,21 +34,21 @@ namespace ZiggyAlloc
         /// For multi-element allocations, this refers to the first element.
         /// The reference remains valid until the AutoFreeMemory instance is disposed.
         /// </remarks>
-        public ref T Value => ref Pointer.Value;
+        public ref T Value => ref Buffer[0];
 
         /// <summary>
         /// Initializes a new AutoFreeMemory instance with allocated memory.
         /// </summary>
         /// <param name="allocator">The allocator to use for memory operations</param>
-        /// <param name="count">The number of instances to allocate</param>
-        /// <param name="zeroed">Whether to zero-initialize the allocated memory</param>
+        /// <param name="elementCount">The number of elements to allocate</param>
+        /// <param name="zeroMemory">Whether to zero-initialize the allocated memory</param>
         /// <exception cref="ArgumentNullException">Thrown when allocator is null</exception>
         /// <exception cref="OutOfMemoryException">Thrown when memory allocation fails</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when count is less than 1</exception>
-        internal AutoFreeMemory(IMemoryAllocator allocator, int count, bool zeroed)
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when elementCount is less than 0</exception>
+        internal AutoFreeMemory(IUnmanagedMemoryAllocator allocator, int elementCount, bool zeroMemory)
         {
             _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
-            Pointer = allocator.Allocate<T>(count, zeroed);
+            Buffer = allocator.Allocate<T>(elementCount, zeroMemory);
         }
 
         /// <summary>
@@ -56,9 +56,9 @@ namespace ZiggyAlloc
         /// </summary>
         /// <remarks>
         /// This method is called automatically when the AutoFreeMemory instance goes out of scope
-        /// or when used in a 'using' statement. After disposal, the Pointer and Value properties
+        /// or when used in a 'using' statement. After disposal, the Buffer and Value properties
         /// should not be accessed as they will refer to freed memory.
         /// </remarks>
-        public void Dispose() => _allocator.Free(Pointer.Raw);
+        public void Dispose() => _allocator.Free(Buffer.RawPointer);
     }
 }
