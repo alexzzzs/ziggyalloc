@@ -12,8 +12,4 @@
     <ProjectReference Include="../ZiggyAlloc.Main.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="**/*.cs" Exclude="bin/**;obj/**" />
-  </ItemGroup>
-
 </Project>
