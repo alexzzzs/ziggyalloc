@@ -375,3 +375,54 @@ PROJECT_SUMMARY.md
 release-artifacts/
 *.nupkg
 *.snupkg
+
+# Additional ZiggyAlloc specific ignores
+*.user
+*.userosscache
+*.suo
+*.orig
+*.bak
+*.tmp
+*.temp
+*~
+*.log
+*.vspscc
+*.vssscc
+*.DotSettings.user
+_ReSharper.*
+_RewriteRules*
+.nuget/packages/
+*.ide/
+.DS_Store
+Thumbs.db
+
+# IDE specific files
+*.csproj.user
+*.vcxproj.user
+*.vcxproj.filters
+
+# Benchmark artifacts
+BenchmarkDotNet.Artifacts/
+BenchmarkDotNet.Reports/
+*.benchmarks
+*.benchmark.results
+
+# Test artifacts
+TestResults/
+*.testresults
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet specific
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio specific
+*.VC.db
+*.VC.VC.opendb
+*.vswp
+*.vsidx
+*.vscfg
+*.vsconfig
