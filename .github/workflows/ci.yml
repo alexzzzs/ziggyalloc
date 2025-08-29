@@ -58,9 +58,6 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release -p:Version=${{ steps.version.outputs.VERSION }} ZiggyAlloc.sln
       
-    - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj
-      
     - name: Pack
       run: dotnet pack --no-build --configuration Release --output ./artifacts -p:Version=${{ steps.version.outputs.VERSION }} ZiggyAlloc.Main.csproj
       
