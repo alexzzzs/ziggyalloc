@@ -5,6 +5,20 @@ All notable changes to ZiggyAlloc will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-08-29
+
+### Added
+- **Enhanced HybridAllocator** - Fully implemented hybrid allocation strategy that uses managed arrays for small allocations and unmanaged memory for large allocations
+- **Improved Documentation** - Updated documentation reflecting the enhanced HybridAllocator implementation
+
+### Changed
+- **HybridAllocator** - Now actually implements the hybrid allocation strategy instead of delegating to unmanaged allocator for all cases
+- **UnmanagedBuffer<T>** - Enhanced to support proper cleanup of managed arrays used by HybridAllocator
+- **Performance** - Improved allocation performance for small arrays by using managed memory where appropriate
+
+### Fixed
+- **HybridAllocator Implementation** - Fixed the implementation to actually use managed arrays for small allocations as intended
+
 ## [1.2.0] - 2025-08-29
 
 ### Added

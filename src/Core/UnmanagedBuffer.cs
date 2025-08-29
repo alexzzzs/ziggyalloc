@@ -14,6 +14,7 @@ namespace ZiggyAlloc
         private readonly int _length;
         private readonly IUnmanagedMemoryAllocator? _allocator;
         private readonly object? _pool; // Reference to the pool that owns this buffer
+        private readonly object? _managedArrayInfo; // Reference to managed array info for hybrid allocator
         private readonly bool _ownsMemory;
 
         /// <summary>
@@ -50,6 +51,7 @@ namespace ZiggyAlloc
             _length = length;
             _allocator = allocator;
             _pool = null;
+            _managedArrayInfo = null;
             _ownsMemory = true;
         }
 
@@ -62,6 +64,7 @@ namespace ZiggyAlloc
             _length = length;
             _allocator = null;
             _pool = null;
+            _managedArrayInfo = null;
             _ownsMemory = false;
         }
 
@@ -74,6 +77,20 @@ namespace ZiggyAlloc
             _length = length;
             _allocator = null;
             _pool = pool;
+            _managedArrayInfo = null;
+            _ownsMemory = true;
+        }
+
+        /// <summary>
+        /// Internal constructor for managed array buffers from HybridAllocator.
+        /// </summary>
+        internal UnmanagedBuffer(T* pointer, int length, HybridAllocator.ManagedArrayInfo managedArrayInfo)
+        {
+            _pointer = pointer;
+            _length = length;
+            _allocator = null;
+            _pool = null;
+            _managedArrayInfo = managedArrayInfo;
             _ownsMemory = true;
         }
 
@@ -213,7 +230,17 @@ namespace ZiggyAlloc
             {
                 if (_allocator != null)
                 {
+                    // Use regular allocator free
                     _allocator.Free((IntPtr)_pointer);
+                }
+                else if (_managedArrayInfo != null)
+                {
+                    // Free managed array by unpinning it
+                    var info = (HybridAllocator.ManagedArrayInfo)_managedArrayInfo;
+                    if (info.Handle.IsAllocated)
+                    {
+                        info.Handle.Free();
+                    }
                 }
             }
         }

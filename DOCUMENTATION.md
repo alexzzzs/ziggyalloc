@@ -163,26 +163,39 @@ using var buffer2 = pool.Allocate<int>(100);
 
 ### HybridAllocator
 
-An allocator that automatically chooses between managed and unmanaged allocation based on size and type to optimize performance for different scenarios.
+An enhanced allocator that automatically chooses between managed and unmanaged allocation based on size and type to optimize performance for different scenarios. For small allocations where managed arrays are faster, it uses managed memory. For larger allocations where GC pressure is a concern, it uses unmanaged memory.
 
 ```csharp
 var systemAllocator = new SystemMemoryAllocator();
 var hybridAllocator = new HybridAllocator(systemAllocator);
 
 // Allocation strategy chosen automatically based on type and size
-using var buffer = hybridAllocator.Allocate<int>(1000);
+// Small allocations may use managed arrays for better performance
+using var smallBuffer = hybridAllocator.Allocate<int>(100);
+
+// Large allocations will use unmanaged memory to avoid GC pressure
+using var largeBuffer = hybridAllocator.Allocate<int>(10000);
 ```
 
-**Key Benefits:**
-- Automatic optimization based on data type and size
-- Eliminates need to manually choose allocation strategy
-- Best of both worlds: performance where unmanaged is better, simplicity where managed is better
+**Enhanced Features:**
+- Intelligent allocation strategy selection based on benchmark data
+- Uses managed arrays for small allocations (faster access)
+- Uses unmanaged memory for large allocations (eliminates GC pressure)
+- Automatic cleanup of both managed and unmanaged resources
 - Thread-safe implementation
+
+**Performance Thresholds:**
+- Byte arrays: Managed allocation for ≤1024 elements
+- Int arrays: Managed allocation for ≤512 elements
+- Double arrays: Managed allocation for ≤128 elements
+- Structs: Managed allocation for ≤64 elements
+- Other types: Calculated thresholds based on size
 
 **Use Cases:**
 - Applications that handle various data types and sizes
 - When you want optimal performance without manual tuning
 - Mixed workloads with different allocation patterns
+- Scenarios where you're unsure which allocation strategy to use
 
 **Thread Safety:** ✅ Thread-safe
 

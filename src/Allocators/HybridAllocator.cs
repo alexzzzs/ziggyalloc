@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace ZiggyAlloc
@@ -56,7 +57,7 @@ namespace ZiggyAlloc
             }
 
             // Calculate total size
-            int elementSize = System.Runtime.InteropServices.Marshal.SizeOf<T>();
+            int elementSize = Marshal.SizeOf<T>();
             long totalSize = (long)elementCount * elementSize;
             if (totalSize > int.MaxValue)
                 throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes exceeds maximum allocation size");
@@ -66,7 +67,7 @@ namespace ZiggyAlloc
 
             if (useUnmanaged)
             {
-                // Use unmanaged allocation
+                // Use unmanaged allocation for larger allocations where GC pressure is a concern
                 var buffer = _unmanagedAllocator.Allocate<T>(elementCount, zeroMemory);
                 
                 // Update allocation tracking
@@ -76,14 +77,25 @@ namespace ZiggyAlloc
             }
             else
             {
-                // For small allocations where managed arrays are faster, we still use the unmanaged allocator
-                // but note that a true hybrid implementation would use managed arrays and pin them
-                var buffer = _unmanagedAllocator.Allocate<T>(elementCount, zeroMemory);
+                // Use managed allocation for small allocations where it's faster
+                // Create a managed array and pin it to get a pointer
+                var managedArray = new T[elementCount];
+                
+                // Zero-initialize if requested (arrays are zero-initialized by default in .NET)
+                if (zeroMemory && !IsZeroInitialized<T>())
+                {
+                    Array.Clear(managedArray, 0, managedArray.Length);
+                }
+                
+                // Pin the array to get a stable pointer
+                var handle = GCHandle.Alloc(managedArray, GCHandleType.Pinned);
+                var pointer = (T*)handle.AddrOfPinnedObject();
                 
                 // Update allocation tracking
                 Interlocked.Add(ref _totalAllocatedBytes, totalSize);
                 
-                return new UnmanagedBuffer<T>((T*)buffer.RawPointer, elementCount, this);
+                // Create a buffer that wraps the managed memory with cleanup information
+                return new UnmanagedBuffer<T>(pointer, elementCount, new ManagedArrayInfo { Array = managedArray!, Handle = handle });
             }
         }
 
@@ -119,6 +131,16 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
+        /// Checks if a type is zero-initialized by default.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsZeroInitialized<T>() where T : unmanaged
+        {
+            // Arrays in .NET are zero-initialized by default
+            return true;
+        }
+
+        /// <summary>
         /// Frees previously allocated unmanaged memory.
         /// </summary>
         /// <param name="pointer">The pointer to the memory to free</param>
@@ -127,8 +149,18 @@ namespace ZiggyAlloc
             if (pointer == IntPtr.Zero)
                 return;
 
-            // Delegate to the unmanaged allocator
+            // Delegate to the unmanaged allocator for unmanaged memory
             _unmanagedAllocator.Free(pointer);
+            // Note: Managed arrays are automatically cleaned up by the GC when the UnmanagedBuffer is disposed
+        }
+
+        /// <summary>
+        /// Information about a managed array used for proper cleanup.
+        /// </summary>
+        internal class ManagedArrayInfo
+        {
+            public Array? Array { get; set; }
+            public GCHandle Handle { get; set; }
         }
     }
 }
