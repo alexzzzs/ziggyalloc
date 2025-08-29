@@ -8,10 +8,11 @@ namespace ZiggyAlloc
     /// <summary>
     /// An allocator that automatically chooses between managed and unmanaged allocation based on size and type.
     /// </summary>
-    public sealed class HybridAllocator : IUnmanagedMemoryAllocator
+    public sealed class HybridAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
         private readonly IUnmanagedMemoryAllocator _unmanagedAllocator;
         private long _totalAllocatedBytes;
+        private bool _disposed = false;
 
         // Thresholds based on benchmark results
         private const int BYTE_THRESHOLD = 1024;
@@ -49,6 +50,9 @@ namespace ZiggyAlloc
         {
             if (elementCount < 0)
                 throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
+
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(HybridAllocator));
 
             if (elementCount == 0)
             {
@@ -95,7 +99,7 @@ namespace ZiggyAlloc
                 Interlocked.Add(ref _totalAllocatedBytes, totalSize);
                 
                 // Create a buffer that wraps the managed memory with cleanup information
-                return new UnmanagedBuffer<T>(pointer, elementCount, new ManagedArrayInfo { Array = managedArray!, Handle = handle });
+                return new UnmanagedBuffer<T>(pointer, elementCount, new ManagedArrayInfo { Array = managedArray, Handle = handle });
             }
         }
 
@@ -149,9 +153,25 @@ namespace ZiggyAlloc
             if (pointer == IntPtr.Zero)
                 return;
 
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(HybridAllocator));
+
             // Delegate to the unmanaged allocator for unmanaged memory
             _unmanagedAllocator.Free(pointer);
             // Note: Managed arrays are automatically cleaned up by the GC when the UnmanagedBuffer is disposed
+        }
+
+        /// <summary>
+        /// Disposes the HybridAllocator and releases any unmanaged resources.
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                // The unmanaged allocator should be disposed by its owner
+                // We don't dispose it here as we don't own it
+            }
         }
 
         /// <summary>
@@ -159,7 +179,7 @@ namespace ZiggyAlloc
         /// </summary>
         internal class ManagedArrayInfo
         {
-            public Array? Array { get; set; }
+            public Array Array { get; set; } = null!;
             public GCHandle Handle { get; set; }
         }
     }

@@ -31,7 +31,15 @@ namespace ZiggyAlloc
         /// <summary>
         /// Gets the total number of bytes currently allocated by this allocator.
         /// </summary>
-        public long TotalAllocatedBytes => _backingAllocator.TotalAllocatedBytes;
+        /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
+        public long TotalAllocatedBytes 
+        { 
+            get
+            {
+                ThrowIfDisposed();
+                return _backingAllocator.TotalAllocatedBytes;
+            }
+        }
 
         /// <summary>
         /// Allocates unmanaged memory for the specified number of elements.

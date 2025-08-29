@@ -167,7 +167,7 @@ An enhanced allocator that automatically chooses between managed and unmanaged a
 
 ```csharp
 var systemAllocator = new SystemMemoryAllocator();
-var hybridAllocator = new HybridAllocator(systemAllocator);
+using var hybridAllocator = new HybridAllocator(systemAllocator);
 
 // Allocation strategy chosen automatically based on type and size
 // Small allocations may use managed arrays for better performance
@@ -183,6 +183,7 @@ using var largeBuffer = hybridAllocator.Allocate<int>(10000);
 - Uses unmanaged memory for large allocations (eliminates GC pressure)
 - Automatic cleanup of both managed and unmanaged resources
 - Thread-safe implementation
+- Implements IDisposable for proper resource management
 
 **Performance Thresholds:**
 - Byte arrays: Managed allocation for ≤1024 elements

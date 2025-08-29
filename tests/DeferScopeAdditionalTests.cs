@@ -30,7 +30,7 @@ namespace ZiggyAlloc.Tests
             defer.Dispose(); // Dispose first
             
             // Act & Assert
-            Assert.Throws<InvalidOperationException>(() => defer.Defer(() => { }));
+            Assert.Throws<ObjectDisposedException>(() => defer.Defer(() => { }));
         }
 
         [Fact]
@@ -144,7 +144,6 @@ namespace ZiggyAlloc.Tests
                         
                         // Assert
                         Assert.Equal(2, defer.Count);
-                        Assert.Equal(2, executionLog.Count); // This won't be true until dispose
                     }
                 });
             }

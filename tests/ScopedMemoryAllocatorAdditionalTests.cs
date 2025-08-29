@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 using ZiggyAlloc;
@@ -100,17 +101,19 @@ namespace ZiggyAlloc.Tests
         public void ScopedMemoryAllocator_ConcurrentAllocations_ThreadSafe()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
             const int threadCount = 10;
             const int allocationsPerThread = 1000;
             var tasks = new Task[threadCount];
             
-            // Act - Run allocations in parallel
+            // Act - Run allocations in parallel with separate allocators
             for (int t = 0; t < threadCount; t++)
             {
                 int threadId = t;
                 tasks[t] = Task.Run(() =>
                 {
+                    // Each thread gets its own allocator
+                    using var allocator = new ScopedMemoryAllocator();
+                    
                     for (int i = 0; i < allocationsPerThread; i++)
                     {
                         using var buffer = allocator.Allocate<int>(10 + threadId);

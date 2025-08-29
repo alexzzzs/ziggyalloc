@@ -48,7 +48,7 @@ namespace ZiggyAlloc
             if (_disposed)
                 return;
 
-            Exception? firstException = null;
+            List<Exception>? exceptions = null;
 
             // Execute all deferred actions in reverse order
             while (_deferredActions.Count > 0)
@@ -59,16 +59,22 @@ namespace ZiggyAlloc
                 }
                 catch (Exception ex)
                 {
-                    // Store first exception but continue cleanup
-                    firstException ??= ex;
+                    // Collect all exceptions
+                    exceptions ??= new List<Exception>();
+                    exceptions.Add(ex);
                 }
             }
 
             _disposed = true;
 
-            // Re-throw first exception if any occurred
-            if (firstException != null)
-                throw firstException;
+            // Throw all exceptions if any occurred
+            if (exceptions != null)
+            {
+                if (exceptions.Count == 1)
+                    throw exceptions[0];
+                else
+                    throw new AggregateException(exceptions);
+            }
         }
 
         private void ThrowIfDisposed()

@@ -35,9 +35,9 @@ namespace ZiggyAlloc.Tests
             Assert.True(buffer2.IsValid);
             Assert.Equal(100, buffer2.Length);
             
-            // Since we reused from pool, total allocated bytes should not increase significantly
-            // (There might be slight differences due to tracking overhead)
-            Assert.True(afterSecondAllocationBytes <= initialAllocatedBytes + 1000); // Allow some overhead
+            // Since we reused from pool, total allocated bytes should remain the same
+            // (The pool tracks the total bytes ever allocated, not currently allocated)
+            Assert.Equal(initialAllocatedBytes, afterSecondAllocationBytes);
             
             // Verify buffer is properly initialized (not containing old data)
             for (int i = 0; i < Math.Min(10, buffer2.Length); i++)

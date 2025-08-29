@@ -46,6 +46,7 @@ namespace ZiggyAlloc
         private readonly string _allocatorName;
         private readonly MemoryLeakReportingMode _leakReportingMode;
         private readonly object _lockObject = new();
+        private bool _disposed = false;
 
         /// <summary>
         /// Gets a value indicating whether this allocator supports individual memory deallocation.
@@ -85,6 +86,7 @@ namespace ZiggyAlloc
         /// <returns>A buffer representing the allocated memory</returns>
         /// <exception cref="OutOfMemoryException">Thrown when memory allocation fails</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when elementCount is less than 0</exception>
+        /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
         public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
             return AllocateWithCallerInfo<T>(elementCount, zeroMemory);
@@ -98,6 +100,8 @@ namespace ZiggyAlloc
             [CallerLineNumber] int sourceLine = 0,
             [CallerMemberName] string callerMember = "") where T : unmanaged
         {
+            CheckDisposed();
+            
             var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
             
             // Don't track empty allocations since they don't allocate actual memory
@@ -132,8 +136,11 @@ namespace ZiggyAlloc
         /// Passing IntPtr.Zero is safe and will be ignored.
         /// If the pointer was not allocated by this allocator, a warning is logged.
         /// </remarks>
+        /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
         public void Free(IntPtr pointer)
         {
+            CheckDisposed();
+            
             if (pointer == IntPtr.Zero) 
                 return;
 
@@ -152,8 +159,6 @@ namespace ZiggyAlloc
             _backingAllocator.Free(pointer);
         }
 
-
-
         /// <summary>
         /// Reports any memory leaks (unfreed allocations) and disposes the allocator.
         /// </summary>
@@ -165,7 +170,12 @@ namespace ZiggyAlloc
         /// </remarks>
         public void Dispose()
         {
-            ReportMemoryLeaks();
+            if (_disposed)
+                return;
+                
+            _disposed = true;
+            // Don't call CheckDisposed() here to avoid circular dependency
+            ReportMemoryLeaksInternal();
         }
 
         /// <summary>
@@ -175,6 +185,15 @@ namespace ZiggyAlloc
         /// Thrown when leaks are detected and reporting mode is set to Throw
         /// </exception>
         public void ReportMemoryLeaks()
+        {
+            CheckDisposed();
+            ReportMemoryLeaksInternal();
+        }
+        
+        /// <summary>
+        /// Internal method to check for and report any memory leaks without disposed check.
+        /// </summary>
+        private void ReportMemoryLeaksInternal()
         {
             Dictionary<IntPtr, AllocationMetadata> leakedAllocations;
             
@@ -225,12 +244,25 @@ namespace ZiggyAlloc
         /// Gets the number of currently tracked (unfreed) allocations.
         /// </summary>
         /// <returns>The number of allocations that haven't been freed</returns>
+        /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
         public int GetTrackedAllocationCount()
         {
+            CheckDisposed();
+            
             lock (_lockObject)
             {
                 return _trackedAllocations.Count;
             }
+        }
+        
+        /// <summary>
+        /// Checks if the allocator has been disposed and throws ObjectDisposedException if so.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
+        private void CheckDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(DebugMemoryAllocator));
         }
     }
 }

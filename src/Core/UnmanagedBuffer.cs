@@ -233,6 +233,14 @@ namespace ZiggyAlloc
                     // Use regular allocator free
                     _allocator.Free((IntPtr)_pointer);
                 }
+                else if (_pool != null)
+                {
+                    // Use pool free
+                    if (_pool is IUnmanagedMemoryAllocator poolAllocator)
+                    {
+                        poolAllocator.Free((IntPtr)_pointer);
+                    }
+                }
                 else if (_managedArrayInfo != null)
                 {
                     // Free managed array by unpinning it

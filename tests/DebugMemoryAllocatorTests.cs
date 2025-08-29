@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using ZiggyAlloc;
@@ -68,7 +69,6 @@ namespace ZiggyAlloc.Tests
         {
             // Arrange
             var backend = new SystemMemoryAllocator();
-            bool leakLogged = false;
             
             // Capture the leak detection output
             var originalError = Console.Error;

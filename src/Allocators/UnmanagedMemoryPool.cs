@@ -87,12 +87,10 @@ namespace ZiggyAlloc
                 // Successfully retrieved a buffer from the pool
                 _bufferInfo.TryRemove(pointer, out _);
                 
-                // Zero the memory if requested
-                if (zeroMemory)
-                {
-                    var byteSpan = new Span<byte>((void*)pointer, sizeInBytes);
-                    byteSpan.Clear();
-                }
+                // Zero the memory by default when reusing from pool
+                // This ensures buffers are properly initialized and don't contain old data
+                var byteSpan = new Span<byte>((void*)pointer, sizeInBytes);
+                byteSpan.Clear();
             }
             else
             {
