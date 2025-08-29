@@ -23,7 +23,7 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void UnmanagedBuffer_AccessAfterDispose_ThrowsInvalidOperationException()
+        public void UnmanagedBuffer_AccessAfterDispose_ThrowsObjectDisposedException()
         {
             // Arrange
             var allocator = new SystemMemoryAllocator();
@@ -32,10 +32,10 @@ namespace ZiggyAlloc.Tests
             buffer.Dispose(); // Dispose first
             
             // Act & Assert
-            Assert.Throws<InvalidOperationException>(() => { var _ = buffer[0]; });
-            Assert.Throws<InvalidOperationException>(() => buffer[0] = 42);
-            Assert.Throws<InvalidOperationException>(() => { var _ = buffer.First; });
-            Assert.Throws<InvalidOperationException>(() => { var _ = buffer.Last; });
+            Assert.Throws<ObjectDisposedException>(() => { var _ = buffer[0]; });
+            Assert.Throws<ObjectDisposedException>(() => buffer[0] = 42);
+            Assert.Throws<ObjectDisposedException>(() => { var _ = buffer.First; });
+            Assert.Throws<ObjectDisposedException>(() => { var _ = buffer.Last; });
         }
 
         [Fact]
