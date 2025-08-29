@@ -14,7 +14,7 @@ Fundamental usage examples for getting started with ZiggyAlloc.
 ### 02-Advanced
 Advanced features and patterns.
 
-- *(To be added)*
+- *More advanced exmples are inlcuded here* 
 
 ### 03-Allocators
 Examples specific to different allocator types.
