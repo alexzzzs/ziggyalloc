@@ -23,7 +23,7 @@ namespace ZiggyAlloc
     /// - Performance-critical code with allocation hotspots
     /// - Scenarios where buffer sizes are predictable
     /// </remarks>
-    public sealed class UnmanagedMemoryPool : IUnmanagedMemoryAllocator
+    public sealed class UnmanagedMemoryPool : IUnmanagedMemoryAllocator, IDisposable
     {
         private readonly ConcurrentDictionary<string, object> _pools; // Type+size -> pool mapping
         private readonly ConcurrentDictionary<IntPtr, (int size, string key)> _bufferInfo;
