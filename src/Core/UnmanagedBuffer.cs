@@ -27,6 +27,7 @@ namespace ZiggyAlloc
         private readonly T* _pointer;
         private readonly int _length;
         private readonly IUnmanagedMemoryAllocator? _allocator;
+        private readonly object? _pool; // Reference to the pool that owns this buffer
         private readonly bool _ownsMemory;
 
         /// <summary>
@@ -69,6 +70,7 @@ namespace ZiggyAlloc
             _pointer = pointer;
             _length = length;
             _allocator = allocator;
+            _pool = null;
             _ownsMemory = true;
         }
 
@@ -86,7 +88,23 @@ namespace ZiggyAlloc
             _pointer = pointer;
             _length = length;
             _allocator = null;
+            _pool = null;
             _ownsMemory = false;
+        }
+
+        /// <summary>
+        /// Internal constructor for pool-based buffers.
+        /// </summary>
+        /// <param name="pointer">Pointer to the allocated memory</param>
+        /// <param name="length">Number of elements in the buffer</param>
+        /// <param name="pool">The pool that owns this buffer</param>
+        internal UnmanagedBuffer(T* pointer, int length, object pool)
+        {
+            _pointer = pointer;
+            _length = length;
+            _allocator = null;
+            _pool = pool;
+            _ownsMemory = true;
         }
 
         /// <summary>
@@ -279,9 +297,13 @@ namespace ZiggyAlloc
         /// </remarks>
         public void Dispose()
         {
-            if (_ownsMemory && _allocator != null && _pointer != null)
+            if (_ownsMemory && _pointer != null)
             {
-                _allocator.Free((IntPtr)_pointer);
+                if (_allocator != null)
+                {
+                    // Use regular allocator free
+                    _allocator.Free((IntPtr)_pointer);
+                }
             }
         }
 

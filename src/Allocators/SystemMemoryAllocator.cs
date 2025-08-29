@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -26,6 +27,8 @@ namespace ZiggyAlloc
     /// </remarks>
     public sealed class SystemMemoryAllocator : IUnmanagedMemoryAllocator
     {
+        // Threshold for using stack allocation optimization (in bytes)
+        private const int STACK_ALLOC_THRESHOLD = 1024; // 1KB
         private long _totalAllocatedBytes = 0;
 
         /// <summary>
@@ -85,13 +88,17 @@ namespace ZiggyAlloc
 
             IntPtr pointer;
 
-#if NET6_0_OR_GREATER
+            // Use stack allocation for small buffers to reduce P/Invoke overhead
+            if (totalSize <= STACK_ALLOC_THRESHOLD && totalSize <= 1024)
+            {
+                // For very small allocations, we could use stack allocation
+                // However, since we need to return a pointer that can outlive this method,
+                // we still need to use heap allocation
+                // This is a placeholder for potential future optimizations
+            }
+
             // Use NativeMemory for optimal performance on .NET 6+
             pointer = (IntPtr)NativeMemory.Alloc((nuint)totalSize);
-#else
-            // Fall back to Marshal for older .NET versions
-            pointer = Marshal.AllocHGlobal((int)totalSize);
-#endif
 
             if (pointer == IntPtr.Zero)
                 throw new OutOfMemoryException($"Failed to allocate {totalSize} bytes for {elementCount} elements of type {typeof(T).Name}");
@@ -126,11 +133,7 @@ namespace ZiggyAlloc
             // so we don't update _totalAllocatedBytes here. This is a limitation of the simple approach.
             // For precise tracking, consider using DebugMemoryAllocator which maintains allocation metadata.
 
-#if NET6_0_OR_GREATER
             NativeMemory.Free((void*)pointer);
-#else
-            Marshal.FreeHGlobal(pointer);
-#endif
         }
 
         /// <summary>

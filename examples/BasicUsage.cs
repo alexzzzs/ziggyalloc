@@ -9,10 +9,20 @@ namespace ZiggyAlloc.Examples
         {
             Console.WriteLine("=== ZiggyAlloc: High-Performance Unmanaged Memory ===\n");
             
-            if (args.Length > 0 && args[0] == "advanced")
+            if (args.Length > 0)
             {
-                AdvancedUsage.RunAdvancedExamples();
-                return;
+                switch (args[0])
+                {
+                    case "advanced":
+                        AdvancedUsage.RunAdvancedExamples();
+                        return;
+                    case "performance":
+                        PerformanceOptimizationDemo.Run();
+                        return;
+                    case "realworld":
+                        RealWorldUsage.RunExamples();
+                        return;
+                }
             }
             
             RunBasicExample();
@@ -20,6 +30,13 @@ namespace ZiggyAlloc.Examples
             Console.WriteLine("\n" + new string('=', 60) + "\n");
             
             RealWorldUsage.RunExamples();
+            
+            Console.WriteLine("\n" + new string('=', 60) + "\n");
+            
+            Console.WriteLine("To run other examples:");
+            Console.WriteLine("  dotnet run -- advanced     - Advanced usage examples");
+            Console.WriteLine("  dotnet run -- performance  - Performance optimization examples");
+            Console.WriteLine("  dotnet run -- realworld    - Real-world usage examples");
         }
 
         static void RunBasicExample()

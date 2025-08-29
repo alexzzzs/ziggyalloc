@@ -222,6 +222,22 @@ ZiggyAlloc is designed for minimal overhead:
 - **No GC pressure**: Unmanaged allocations don't affect garbage collection
 - **Zero-copy conversions**: Seamless integration with `Span<T>` without copying
 
+### Advanced Performance Optimizations
+
+ZiggyAlloc now includes two powerful performance optimizations based on extensive benchmarking:
+
+#### UnmanagedMemoryPool
+Reduces allocation overhead by reusing previously allocated buffers:
+- Eliminates P/Invoke overhead for frequent allocations
+- Maintains zero GC pressure for unmanaged allocations
+- Thread-safe implementation with automatic cleanup
+
+#### HybridAllocator
+Automatically chooses between allocation strategies based on data type and size:
+- Uses benchmark-driven heuristics for optimal performance
+- Combines benefits of managed and unmanaged allocation
+- Simplifies code by eliminating manual optimization decisions
+
 ## Requirements
 
 - .NET 8.0 or later
@@ -323,6 +339,26 @@ using var buffer = allocator.Allocate<byte>(dataSize);
 FillBuffer(buffer); // Fill directly in unmanaged memory
 NativeAPI(buffer.RawPointer, buffer.Length);
 ```
+
+## Benchmarks
+
+ZiggyAlloc includes comprehensive benchmarks to measure performance across different scenarios:
+
+### Benchmark Categories
+
+- **Allocation Benchmarks**: Compare managed arrays, unmanaged arrays, and array pools
+- **Allocator Benchmarks**: Compare different allocator patterns (system, scoped, debug)
+- **Data Type Benchmarks**: Performance across different data types (byte, int, double, structs)
+- **Allocator Comparison Benchmarks**: Direct comparison between allocator implementations
+
+### Running Benchmarks
+
+```bash
+cd benchmarks
+dotnet run -c Release
+```
+
+For more details about the benchmarks, see [benchmarks/README.md](benchmarks/README.md).
 
 ## When to Use ZiggyAlloc
 

@@ -131,6 +131,61 @@ var buffer2 = debugAlloc.Allocate<int>(5);
 
 **Thread Safety:** ✅ Thread-safe
 
+### UnmanagedMemoryPool
+
+A memory pool for unmanaged buffers that reduces allocation overhead by reusing previously allocated buffers.
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+using var pool = new UnmanagedMemoryPool(systemAllocator);
+
+// First allocation - creates new buffer
+using var buffer1 = pool.Allocate<int>(100);
+
+// Second allocation - reuses buffer from pool if available
+using var buffer2 = pool.Allocate<int>(100);
+
+// Buffers are returned to the pool when disposed
+```
+
+**Key Benefits:**
+- Reduces P/Invoke overhead for frequent allocations
+- Eliminates GC pressure for unmanaged allocations
+- Thread-safe implementation
+- Automatic cleanup of unused buffers
+
+**Use Cases:**
+- Frequent allocations of similar-sized buffers
+- Performance-critical code with allocation hotspots
+- Scenarios where buffer sizes are predictable
+
+**Thread Safety:** ✅ Thread-safe
+
+### HybridAllocator
+
+An allocator that automatically chooses between managed and unmanaged allocation based on size and type to optimize performance for different scenarios.
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+var hybridAllocator = new HybridAllocator(systemAllocator);
+
+// Allocation strategy chosen automatically based on type and size
+using var buffer = hybridAllocator.Allocate<int>(1000);
+```
+
+**Key Benefits:**
+- Automatic optimization based on data type and size
+- Eliminates need to manually choose allocation strategy
+- Best of both worlds: performance where unmanaged is better, simplicity where managed is better
+- Thread-safe implementation
+
+**Use Cases:**
+- Applications that handle various data types and sizes
+- When you want optimal performance without manual tuning
+- Mixed workloads with different allocation patterns
+
+**Thread Safety:** ✅ Thread-safe
+
 ## UnmanagedBuffer<T>
 
 The core type for working with unmanaged memory in ZiggyAlloc.
@@ -373,7 +428,51 @@ public static class DeferExtensions
 }
 ```
 
+### UnmanagedMemoryPool
 
+```csharp
+public sealed class UnmanagedMemoryPool : IUnmanagedMemoryAllocator, IDisposable
+{
+    // Constructor
+    public UnmanagedMemoryPool(IUnmanagedMemoryAllocator baseAllocator);
+    
+    // Allocate memory, reusing from pool if available
+    public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged;
+    
+    // Free memory by returning to pool
+    public void Free(IntPtr pointer);
+    
+    // Properties
+    public bool SupportsIndividualDeallocation { get; }
+    public long TotalAllocatedBytes { get; }
+    
+    // Clear all pooled buffers
+    public void Clear();
+    
+    // Dispose the pool
+    public void Dispose();
+}
+```
+
+### HybridAllocator
+
+```csharp
+public sealed class HybridAllocator : IUnmanagedMemoryAllocator
+{
+    // Constructor
+    public HybridAllocator(IUnmanagedMemoryAllocator unmanagedAllocator);
+    
+    // Allocate memory using optimal strategy based on type and size
+    public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged;
+    
+    // Free previously allocated memory
+    public void Free(IntPtr pointer);
+    
+    // Properties
+    public bool SupportsIndividualDeallocation { get; }
+    public long TotalAllocatedBytes { get; }
+}
+```
 
 ## Best Practices
 
@@ -459,6 +558,32 @@ using var buffer2 = allocator.Allocate<int>(100_000);      // 400KB
 Console.WriteLine($"Total allocated: {allocator.TotalAllocatedBytes:N0} bytes");
 ```
 
+### 7. Use UnmanagedMemoryPool for Frequent Allocations
+
+```csharp
+// For scenarios with frequent allocations of similar-sized buffers
+using var pool = new UnmanagedMemoryPool(Z.DefaultAllocator);
+
+// Pool reuses buffers, reducing allocation overhead
+for (int i = 0; i < 1000; i++)
+{
+    using var buffer = pool.Allocate<byte>(1024);
+    // Process buffer...
+    // Buffer returned to pool when disposed
+}
+```
+
+### 8. Use HybridAllocator for Mixed Workloads
+
+```csharp
+// For applications handling various data types and sizes
+var hybridAllocator = new HybridAllocator(Z.DefaultAllocator);
+
+// Allocation strategy chosen automatically based on benchmarks
+using var smallBuffer = hybridAllocator.Allocate<byte>(100);   // May use managed
+using var largeBuffer = hybridAllocator.Allocate<double>(1000); // Will use unmanaged
+```
+
 ## Performance Considerations
 
 ### 1. Allocation Patterns
@@ -507,6 +632,68 @@ if (needsZeroing)
 {
     buffer.AsSpan().Clear(); // Manual zeroing when needed
 }
+```
+
+## Performance Optimizations
+
+ZiggyAlloc includes advanced performance optimizations to address specific use cases:
+
+### UnmanagedMemoryPool
+
+The UnmanagedMemoryPool reduces allocation overhead by reusing previously allocated buffers. This is particularly effective for:
+
+1. **Frequent Allocations**: Scenarios with high-frequency allocations of similar-sized buffers
+2. **Allocation Hotspots**: Code paths where allocation performance is critical
+3. **Predictable Buffer Sizes**: Applications that work with consistent buffer sizes
+
+**Performance Benefits:**
+- Eliminates P/Invoke overhead for pooled allocations
+- Reduces system memory allocation calls
+- Maintains zero GC pressure for unmanaged allocations
+
+```csharp
+// Without pooling - each allocation calls into the OS
+var allocator = new SystemMemoryAllocator();
+for (int i = 0; i < 1000; i++)
+{
+    using var buffer = allocator.Allocate<byte>(1024); // System call each time
+    // Process buffer...
+}
+
+// With pooling - first allocation per size calls OS, subsequent allocations reuse
+using var pool = new UnmanagedMemoryPool(allocator);
+for (int i = 0; i < 1000; i++)
+{
+    using var buffer = pool.Allocate<byte>(1024); // Reuses pooled buffer
+    // Process buffer...
+}
+```
+
+### HybridAllocator
+
+The HybridAllocator automatically chooses between allocation strategies based on benchmark-driven heuristics:
+
+1. **Small Data Types**: For small allocations where managed arrays are faster
+2. **Large Data Types**: For large allocations where unmanaged arrays eliminate GC pressure
+3. **Mixed Workloads**: Applications that handle various data types and sizes
+
+**Decision Criteria:**
+- Byte arrays: Managed allocation for sizes ≤ 1KB
+- Int arrays: Managed allocation for sizes ≤ 2KB (512 elements)
+- Double arrays: Unmanaged allocation preferred for all but smallest sizes
+- Struct arrays: Unmanaged allocation generally preferred
+
+```csharp
+var hybrid = new HybridAllocator(Z.DefaultAllocator);
+
+// Small byte array - may use managed allocation
+using var smallBytes = hybrid.Allocate<byte>(100);
+
+// Large byte array - will use unmanaged allocation
+using var largeBytes = hybrid.Allocate<byte>(10000);
+
+// Any double array - will use unmanaged allocation to avoid GC pressure
+using var anyDoubles = hybrid.Allocate<double>(100);
 ```
 
 ## Common Patterns

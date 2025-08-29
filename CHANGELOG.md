@@ -8,10 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- 
+- **UnmanagedMemoryPool** - Memory pool that reduces allocation overhead by reusing previously allocated buffers
+- **HybridAllocator** - Allocator that automatically chooses between managed and unmanaged allocation based on size and type
+- **Performance Optimizations Documentation** - Comprehensive documentation of benchmark results and optimization strategies
+- **Pooling Benchmarks** - Benchmarks comparing pooled vs non-pooled allocation performance
+- **Hybrid Allocator Benchmarks** - Benchmarks demonstrating automatic allocation strategy selection
 
 ### Changed
-- 
+- **UnmanagedBuffer<T>** - Modified to support returning buffers to pools when disposed
+- **Documentation** - Updated README.md, DOCUMENTATION.md with information about new performance optimizations
+- **Examples** - Enhanced examples to demonstrate usage of new allocators
 
 ### Fixed
 - 
