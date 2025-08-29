@@ -64,7 +64,7 @@ Write-Host "✓ All tests passed" -ForegroundColor Green
 
 # Create package
 Write-Host "📦 Creating NuGet package..." -ForegroundColor Cyan
-dotnet pack --configuration Release --output ./release-artifacts
+dotnet pack --configuration Release --output ./release-artifacts ZiggyAlloc.Main.csproj
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Package creation failed"
     exit 1

@@ -19,7 +19,7 @@ if (-not ($Version -match '^\d+\.\d+\.\d+$')) {
 Write-Host "Updating ZiggyAlloc to version $Version..." -ForegroundColor Green
 
 # Update project file
-$projectFile = "ZiggyAlloc.csproj"
+$projectFile = "ZiggyAlloc.Main.csproj"
 $content = Get-Content $projectFile -Raw
 
 # Update version properties

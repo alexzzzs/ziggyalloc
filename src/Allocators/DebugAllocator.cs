@@ -100,6 +100,12 @@ namespace ZiggyAlloc
         {
             var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
             
+            // Don't track empty allocations since they don't allocate actual memory
+            if (elementCount == 0)
+            {
+                return backingBuffer;
+            }
+            
             int sizeInBytes;
             unsafe { sizeInBytes = sizeof(T) * elementCount; }
             

@@ -68,7 +68,7 @@ Benchmarks show significant performance improvements over managed arrays for lar
 - **Memory Pooling**: Reduces allocation overhead by reusing buffers
 - **Hybrid Allocation**: Uses managed arrays for small allocations (faster) and unmanaged memory for large allocations (no GC pressure)
 
-See [PERFORMANCE_OPTIMIZATIONS.md](PERFORMANCE_OPTIMIZATIONS.md) for detailed benchmark results.
+See benchmark results in the [benchmarks](benchmarks/) directory for detailed performance comparisons.
 
 ## Examples
 
@@ -121,8 +121,8 @@ Or add to your `.csproj`:
 
 - [Getting Started Guide](GETTING_STARTED.md)
 - [Full API Documentation](DOCUMENTATION.md)
-- [Performance Optimizations](PERFORMANCE_OPTIMIZATIONS.md)
 - [Examples](examples/README.md)
+- [Benchmarks](benchmarks/README.md)
 
 ## Requirements
 

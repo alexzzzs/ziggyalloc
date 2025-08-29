@@ -36,8 +36,8 @@ try {
     
     # Check required files
     $requiredFiles = @(
-        "lib/net8.0/ZiggyAlloc.dll",
-        "lib/net8.0/ZiggyAlloc.xml",
+        "lib/net9.0/ZiggyAlloc.dll",
+        "lib/net9.0/ZiggyAlloc.xml",
         "README.md",
         "ZiggyAlloc.nuspec"
     )
@@ -58,12 +58,12 @@ try {
     }
     
     # Check assembly info
-    $assemblyPath = Join-Path $tempDir "lib/net8.0/ZiggyAlloc.dll"
+    $assemblyPath = Join-Path $tempDir "lib/net9.0/ZiggyAlloc.dll"
     $assembly = [System.Reflection.Assembly]::LoadFrom($assemblyPath)
     $version = $assembly.GetName().Version
     
     Write-Host "  Assembly Version: $version" -ForegroundColor Gray
-    Write-Host "  Target Framework: .NET 8.0" -ForegroundColor Gray
+    Write-Host "  Target Framework: .NET 9.0" -ForegroundColor Gray
     
     # Check for unsafe code (should be present)
     $hasUnsafeCode = $assembly.GetCustomAttributes([System.Security.AllowPartiallyTrustedCallersAttribute], $false).Length -eq 0
@@ -95,6 +95,7 @@ try {
     Write-Host "  File: $($packageFile.Name)"
     Write-Host "  Size: $packageSize KB"
     Write-Host "  Assembly Version: $version"
+    Write-Host "  Target Framework: .NET 9.0"
     Write-Host "  Ready for publishing: ✓"
     
 } finally {

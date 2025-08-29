@@ -14,7 +14,8 @@ Fundamental usage examples for getting started with ZiggyAlloc.
 ### 02-Advanced
 Advanced features and patterns.
 
-- *More advanced exmples are included here* 
+- `DeferPatterns.cs` - Advanced defer patterns and error handling
+- `MemoryLeakDetection.cs` - Memory leak detection with DebugMemoryAllocator 
 
 ### 03-Allocators
 Examples specific to different allocator types.
