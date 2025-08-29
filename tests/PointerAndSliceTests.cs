@@ -248,7 +248,8 @@ namespace ZiggyAlloc.Tests
         {
             var executionOrder = new List<string>();
             
-            Assert.Throws<InvalidOperationException>(() =>
+            var exceptionThrown = false;
+            try
             {
                 using var defer = DeferScope.Start();
                 
@@ -257,11 +258,18 @@ namespace ZiggyAlloc.Tests
                 defer.Defer(() => executionOrder.Add("cleanup2"));
                 
                 // This should still execute cleanup2 and cleanup1 even though middle action throws
-            });
+            }
+            catch (InvalidOperationException ex)
+            {
+                exceptionThrown = ex.Message == "Test exception";
+            }
+            
+            // Exception should have been thrown
+            Assert.True(exceptionThrown);
             
             // Both cleanup actions should have executed despite the exception
-            Assert.Contains("cleanup1", executionOrder);
-            Assert.Contains("cleanup2", executionOrder);
+            Assert.True(executionOrder.Contains("cleanup1"));
+            Assert.True(executionOrder.Contains("cleanup2"));
         }
 
         [Fact]
