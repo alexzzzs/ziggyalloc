@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace ZiggyAlloc
 {
@@ -51,12 +52,26 @@ namespace ZiggyAlloc
         /// <summary>
         /// Gets a value indicating whether this allocator supports individual memory deallocation.
         /// </summary>
-        public bool SupportsIndividualDeallocation => _backingAllocator.SupportsIndividualDeallocation;
+        public bool SupportsIndividualDeallocation 
+        { 
+            get
+            {
+                CheckDisposed();
+                return _backingAllocator.SupportsIndividualDeallocation;
+            }
+        }
 
         /// <summary>
         /// Gets the total number of bytes currently allocated by this allocator.
         /// </summary>
-        public long TotalAllocatedBytes => _backingAllocator.TotalAllocatedBytes;
+        public long TotalAllocatedBytes 
+        { 
+            get
+            {
+                CheckDisposed();
+                return _backingAllocator.TotalAllocatedBytes;
+            }
+        }
 
         /// <summary>
         /// Initializes a new debug memory allocator.
@@ -170,10 +185,10 @@ namespace ZiggyAlloc
         /// </remarks>
         public void Dispose()
         {
-            if (_disposed)
+            if (Volatile.Read(ref _disposed))
                 return;
                 
-            _disposed = true;
+            Volatile.Write(ref _disposed, true);
             // Don't call CheckDisposed() here to avoid circular dependency
             ReportMemoryLeaksInternal();
         }
@@ -261,7 +276,7 @@ namespace ZiggyAlloc
         /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
         private void CheckDisposed()
         {
-            if (_disposed)
+            if (Volatile.Read(ref _disposed))
                 throw new ObjectDisposedException(nameof(DebugMemoryAllocator));
         }
     }

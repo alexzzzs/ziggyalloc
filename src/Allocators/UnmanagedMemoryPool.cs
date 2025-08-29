@@ -74,14 +74,15 @@ namespace ZiggyAlloc
             }
 
             // Calculate total size
-            int elementSize = System.Runtime.InteropServices.Marshal.SizeOf<T>();
+            int elementSize = sizeof(T);
             long totalSize = (long)elementCount * elementSize;
             if (totalSize > int.MaxValue)
-                throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes exceeds maximum allocation size");
+                throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes");
 
             IntPtr pointer = IntPtr.Zero;
             int sizeInBytes = (int)totalSize;
             string key = $"{typeof(T).FullName}:{sizeInBytes}";
+            bool reusedFromPool = false;
 
             // Try to get a buffer from the pool
             if (_pools.TryGetValue(key, out object? poolObj) && 
@@ -90,22 +91,25 @@ namespace ZiggyAlloc
             {
                 // Successfully retrieved a buffer from the pool
                 _bufferInfo.TryRemove(pointer, out _);
+                reusedFromPool = true;
                 
                 // Zero the memory by default when reusing from pool
                 // This ensures buffers are properly initialized and don't contain old data
-                if (zeroMemory || true) // Always zero when reusing from pool for safety
+                // Always zero when reusing from pool for safety, regardless of zeroMemory parameter
+                try
                 {
-                    try
-                    {
-                        var byteSpan = new Span<byte>((void*)pointer, sizeInBytes);
-                        byteSpan.Clear();
-                    }
-                    catch
-                    {
-                        // If we can't zero the memory, we should allocate a new buffer instead
-                        pointer = IntPtr.Zero;
-                    }
+                    var byteSpan = new Span<byte>((void*)pointer, sizeInBytes);
+                    byteSpan.Clear();
                 }
+                catch
+                {
+                    // If we can't zero the memory, we should allocate a new buffer instead
+                    pointer = IntPtr.Zero;
+                    reusedFromPool = false;
+                }
+                
+                // When reusing from pool, we don't add to total allocated bytes
+                // because the memory was already allocated before
             }
             
             // If we couldn't reuse from pool or zeroing failed, allocate a new buffer
@@ -119,8 +123,11 @@ namespace ZiggyAlloc
                 Interlocked.Add(ref _totalAllocatedBytes, sizeInBytes);
             }
 
-            // Track buffer info for disposal
-            _bufferInfo.TryAdd(pointer, (sizeInBytes, key));
+            // Track buffer info for disposal (only add if we allocated a new buffer)
+            if (pointer != IntPtr.Zero && !reusedFromPool)
+            {
+                _bufferInfo.TryAdd(pointer, (sizeInBytes, key));
+            }
 
             return new UnmanagedBuffer<T>((T*)pointer, elementCount, (object)this);
         }

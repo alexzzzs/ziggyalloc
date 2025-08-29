@@ -186,7 +186,7 @@ namespace ZiggyAlloc.Tests
             Assert.Equal(2, debugAllocator.GetTrackedAllocationCount());
             
             // Buffers will be automatically disposed by the using statements
-            // Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
+            // The allocator will be disposed at the end of the using block
         }
 
         [Fact]

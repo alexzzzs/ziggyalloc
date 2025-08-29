@@ -121,7 +121,7 @@ namespace ZiggyAlloc.Tests
                         {
                             buffer[j] = threadId * 1000 + i * 10 + j;
                         }
-                        // Scope disposal will handle cleanup
+                        // Both scope and buffer are disposed here, freeing all memory
                     }
                 });
             }
@@ -150,13 +150,13 @@ namespace ZiggyAlloc.Tests
                     for (int i = 0; i < allocationsPerThread; i++)
                     {
                         using var allocator = new ScopedMemoryAllocator();
-                        var buffer = allocator.Allocate<int>(100 + threadId * 10);
+                        using var buffer = allocator.Allocate<int>(100 + threadId * 10);
                         // Do some work with the buffer
                         for (int j = 0; j < Math.Min(10, buffer.Length); j++)
                         {
                             buffer[j] = threadId * 1000 + i * 10 + j;
                         }
-                        // Allocator is disposed here, freeing all memory
+                        // Both allocator and buffer are disposed here, freeing all memory
                     }
                 });
             }

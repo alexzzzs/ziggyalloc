@@ -8,14 +8,15 @@ namespace ZiggyAlloc
     /// Represents a buffer of unmanaged memory with type-safe access and automatic cleanup options.
     /// </summary>
     /// <typeparam name="T">The unmanaged type stored in the buffer</typeparam>
-    public unsafe struct UnmanagedBuffer<T> : IDisposable where T : unmanaged
+    public unsafe class UnmanagedBuffer<T> : IDisposable where T : unmanaged
     {
-        private readonly T* _pointer;
-        private readonly int _length;
-        private readonly IUnmanagedMemoryAllocator? _allocator;
-        private readonly object? _pool; // Reference to the pool that owns this buffer
-        private readonly object? _managedArrayInfo; // Reference to managed array info for hybrid allocator
-        private readonly bool _ownsMemory;
+        private T* _pointer;
+        private int _length;
+        private IUnmanagedMemoryAllocator? _allocator;
+        private object? _pool; // Reference to the pool that owns this buffer
+        private object? _managedArrayInfo; // Reference to managed array info for hybrid allocator
+        private bool _ownsMemory;
+        private bool _disposed = false;
 
         /// <summary>
         /// Gets the number of elements in the buffer.
@@ -102,6 +103,7 @@ namespace ZiggyAlloc
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
+                ThrowIfDisposed();
                 if (_pointer == null)
                     throw new InvalidOperationException("Buffer is not valid (null pointer)");
                 
@@ -119,6 +121,7 @@ namespace ZiggyAlloc
         {
             get
             {
+                ThrowIfDisposed();
                 if (_pointer == null)
                     throw new InvalidOperationException("Buffer is not valid (null pointer)");
                 
@@ -136,6 +139,7 @@ namespace ZiggyAlloc
         {
             get
             {
+                ThrowIfDisposed();
                 if (_pointer == null)
                     throw new InvalidOperationException("Buffer is not valid (null pointer)");
                 
@@ -147,10 +151,11 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts the buffer to a Span&lt;T&gt; for high-performance operations.
+        /// Converts the buffer to a Span<T> for high-performance operations.
         /// </summary>
         public Span<T> AsSpan()
         {
+            ThrowIfDisposed();
             if (_pointer == null)
                 throw new InvalidOperationException("Buffer is not valid (null pointer)");
             
@@ -158,10 +163,11 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts a portion of the buffer to a Span&lt;T&gt;.
+        /// Converts a portion of the buffer to a Span<T>.
         /// </summary>
         public Span<T> AsSpan(int start, int length)
         {
+            ThrowIfDisposed();
             if (_pointer == null)
                 throw new InvalidOperationException("Buffer is not valid (null pointer)");
             
@@ -175,10 +181,11 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts the buffer to a ReadOnlySpan&lt;T&gt;.
+        /// Converts the buffer to a ReadOnlySpan<T>.
         /// </summary>
         public ReadOnlySpan<T> AsReadOnlySpan()
         {
+            ThrowIfDisposed();
             if (_pointer == null)
                 throw new InvalidOperationException("Buffer is not valid (null pointer)");
             
@@ -190,6 +197,7 @@ namespace ZiggyAlloc
         /// </summary>
         public void Fill(T value)
         {
+            ThrowIfDisposed();
             AsSpan().Fill(value);
         }
 
@@ -198,6 +206,7 @@ namespace ZiggyAlloc
         /// </summary>
         public void Clear()
         {
+            ThrowIfDisposed();
             if (_pointer == null)
                 throw new InvalidOperationException("Buffer is not valid (null pointer)");
             
@@ -210,6 +219,7 @@ namespace ZiggyAlloc
         /// </summary>
         public void CopyFrom(UnmanagedBuffer<T> source)
         {
+            ThrowIfDisposed();
             source.AsReadOnlySpan().CopyTo(AsSpan());
         }
 
@@ -218,6 +228,7 @@ namespace ZiggyAlloc
         /// </summary>
         public void CopyFrom(ReadOnlySpan<T> source)
         {
+            ThrowIfDisposed();
             source.CopyTo(AsSpan());
         }
 
@@ -226,6 +237,11 @@ namespace ZiggyAlloc
         /// </summary>
         public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             if (_ownsMemory && _pointer != null)
             {
                 if (_allocator != null)
@@ -235,7 +251,9 @@ namespace ZiggyAlloc
                 }
                 else if (_pool != null)
                 {
-                    // Use pool free
+                    // For pool-based buffers, we don't actually free the memory,
+                    // but return it to the pool instead
+                    // The pool will handle the actual freeing when it's disposed
                     if (_pool is IUnmanagedMemoryAllocator poolAllocator)
                     {
                         poolAllocator.Free((IntPtr)_pointer);
@@ -251,16 +269,28 @@ namespace ZiggyAlloc
                     }
                 }
             }
+
+            _disposed = true;
+            _pointer = null;
+            _ownsMemory = false;
         }
 
         /// <summary>
-        /// Implicitly converts the buffer to a Span&lt;T&gt;.
+        /// Implicitly converts the buffer to a Span<T>.
         /// </summary>
         public static implicit operator Span<T>(UnmanagedBuffer<T> buffer) => buffer.AsSpan();
 
         /// <summary>
-        /// Implicitly converts the buffer to a ReadOnlySpan&lt;T&gt;.
+        /// Implicitly converts the buffer to a ReadOnlySpan<T>.
         /// </summary>
         public static implicit operator ReadOnlySpan<T>(UnmanagedBuffer<T> buffer) => buffer.AsReadOnlySpan();
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(UnmanagedBuffer<T>));
+            }
+        }
     }
 }

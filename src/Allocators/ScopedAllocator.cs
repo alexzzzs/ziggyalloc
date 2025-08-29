@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace ZiggyAlloc
 {
@@ -18,6 +19,7 @@ namespace ZiggyAlloc
     {
         private readonly SystemMemoryAllocator _backingAllocator = new();
         private readonly List<IntPtr> _allocatedPointers = new();
+        private readonly object _lock = new();
         private bool _disposed = false;
 
         /// <summary>
@@ -26,14 +28,21 @@ namespace ZiggyAlloc
         /// <remarks>
         /// Scoped allocators do not support individual deallocation - all memory is freed when disposed.
         /// </remarks>
-        public bool SupportsIndividualDeallocation => false;
+        public bool SupportsIndividualDeallocation
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return false;
+            }
+        }
 
         /// <summary>
         /// Gets the total number of bytes currently allocated by this allocator.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
-        public long TotalAllocatedBytes 
-        { 
+        public long TotalAllocatedBytes
+        {
             get
             {
                 ThrowIfDisposed();
@@ -54,10 +63,13 @@ namespace ZiggyAlloc
         public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
             ThrowIfDisposed();
-            
+
             var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
-            _allocatedPointers.Add(backingBuffer.RawPointer);
-            
+            lock (_lock)
+            {
+                _allocatedPointers.Add(backingBuffer.RawPointer);
+            }
+
             // Create a buffer that doesn't own the memory (won't call Free on dispose)
             // The ScopedMemoryAllocator will handle freeing all memory when it's disposed
             unsafe
@@ -72,10 +84,14 @@ namespace ZiggyAlloc
         /// </summary>
         /// <param name="pointer">The pointer to free (ignored)</param>
         /// <exception cref="NotSupportedException">Always thrown as individual deallocation is not supported</exception>
-        public void Free(IntPtr pointer) =>
+        /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
+        public void Free(IntPtr pointer)
+        {
+            ThrowIfDisposed();
             throw new NotSupportedException(
                 "Individual memory deallocation is not supported in ScopedMemoryAllocator. " +
                 "All memory is automatically freed when the allocator is disposed.");
+        }
 
         /// <summary>
         /// Frees all allocated memory and disposes the allocator.
@@ -86,16 +102,28 @@ namespace ZiggyAlloc
         /// </remarks>
         public void Dispose()
         {
-            if (!_disposed)
+            lock (_lock)
             {
+                if (Volatile.Read(ref _disposed))
+                {
+                    return;
+                }
+                Volatile.Write(ref _disposed, true);
+
                 // Free all allocations in reverse order (LIFO)
                 for (int i = _allocatedPointers.Count - 1; i >= 0; i--)
                 {
-                    _backingAllocator.Free(_allocatedPointers[i]);
+                    try
+                    {
+                        _backingAllocator.Free(_allocatedPointers[i]);
+                    }
+                    catch
+                    {
+                        // Ignore exceptions during cleanup
+                    }
                 }
-                
+
                 _allocatedPointers.Clear();
-                _disposed = true;
             }
         }
 
@@ -104,7 +132,7 @@ namespace ZiggyAlloc
         /// </summary>
         private void ThrowIfDisposed()
         {
-            if (_disposed)
+            if (Volatile.Read(ref _disposed))
                 throw new ObjectDisposedException(nameof(ScopedMemoryAllocator));
         }
     }
