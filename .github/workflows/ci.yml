@@ -21,19 +21,19 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '9.0.x'
         
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore ZiggyAlloc.sln
       
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build --no-restore --configuration Release ZiggyAlloc.sln
       
     - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal
+      run: dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj
       
     - name: Run examples
-      run: dotnet run --project examples/ --configuration Release
+      run: dotnet run --project examples/Examples.csproj --configuration Release
 
   publish:
     needs: test
@@ -46,23 +46,23 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '9.0.x'
         
     - name: Extract version from tag
       id: version
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
         
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore ZiggyAlloc.sln
       
     - name: Build
-      run: dotnet build --no-restore --configuration Release -p:Version=${{ steps.version.outputs.VERSION }}
+      run: dotnet build --no-restore --configuration Release -p:Version=${{ steps.version.outputs.VERSION }} ZiggyAlloc.sln
       
     - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal
+      run: dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj
       
     - name: Pack
-      run: dotnet pack --no-build --configuration Release --output ./artifacts -p:Version=${{ steps.version.outputs.VERSION }}
+      run: dotnet pack --no-build --configuration Release --output ./artifacts -p:Version=${{ steps.version.outputs.VERSION }} ZiggyAlloc.Main.csproj
       
     - name: Publish to NuGet
       run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
