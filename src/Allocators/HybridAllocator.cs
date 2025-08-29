@@ -99,7 +99,12 @@ namespace ZiggyAlloc
                 Interlocked.Add(ref _totalAllocatedBytes, totalSize);
                 
                 // Create a buffer that wraps the managed memory with cleanup information
-                return new UnmanagedBuffer<T>(pointer, elementCount, new ManagedArrayInfo { Array = managedArray, Handle = handle });
+                var managedArrayInfo = new HybridAllocator.ManagedArrayInfo 
+                { 
+                    Array = managedArray, 
+                    Handle = handle 
+                };
+                return new UnmanagedBuffer<T>(pointer, elementCount, managedArrayInfo);
             }
         }
 
@@ -179,7 +184,7 @@ namespace ZiggyAlloc
         /// </summary>
         internal class ManagedArrayInfo
         {
-            public Array Array { get; set; } = null!;
+            public Array? Array { get; set; }
             public GCHandle Handle { get; set; }
         }
     }

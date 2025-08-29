@@ -129,7 +129,7 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void DebugMemoryAllocator_ConcurrentAllocations_ThreadSafe()
+        public async Task DebugMemoryAllocator_ConcurrentAllocations_ThreadSafe()
         {
             // Arrange
             var backend = new SystemMemoryAllocator();
@@ -166,7 +166,7 @@ namespace ZiggyAlloc.Tests
             }
 
             // Wait for all tasks to complete
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert
             Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());

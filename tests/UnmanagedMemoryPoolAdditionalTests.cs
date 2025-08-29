@@ -106,7 +106,7 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void UnmanagedMemoryPool_ConcurrentAllocations_SameSize_ThreadSafe()
+        public async Task UnmanagedMemoryPool_ConcurrentAllocations_SameSize_ThreadSafe()
         {
             // Arrange
             var baseAllocator = new SystemMemoryAllocator();
@@ -133,9 +133,45 @@ namespace ZiggyAlloc.Tests
             }
             
             // Wait for all tasks to complete
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
             
             // Assert - No exceptions should have been thrown
+            Assert.True(true);
+        }
+
+        [Fact]
+        public async Task UnmanagedMemoryPool_ConcurrentAllocations_ThreadSafe()
+        {
+            // Arrange
+            var baseAllocator = new SystemMemoryAllocator();
+            using var pool = new UnmanagedMemoryPool(baseAllocator);
+            const int threadCount = 8;
+            const int allocationsPerThread = 100;
+            var tasks = new Task[threadCount];
+
+            // Act - Run allocations in parallel
+            for (int t = 0; t < threadCount; t++)
+            {
+                int threadId = t;
+                tasks[t] = Task.Run(() =>
+                {
+                    for (int i = 0; i < allocationsPerThread; i++)
+                    {
+                        using var buffer = pool.Allocate<int>(50 + threadId * 5);
+                        // Do some work with the buffer
+                        for (int j = 0; j < Math.Min(10, buffer.Length); j++)
+                        {
+                            buffer[j] = threadId * 1000 + i * 10 + j;
+                        }
+                    }
+                });
+            }
+
+            // Wait for all tasks to complete
+            await Task.WhenAll(tasks);
+
+            // Assert - No exceptions should have been thrown
+            // The test passes if we reach this point without exceptions
             Assert.True(true);
         }
 

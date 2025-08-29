@@ -121,7 +121,7 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void DeferScope_ConcurrentUsage_ThreadSafe()
+        public async Task DeferScope_ConcurrentUsage_ThreadSafe()
         {
             // Arrange
             const int threadCount = 10;
@@ -149,8 +149,49 @@ namespace ZiggyAlloc.Tests
             }
             
             // Wait for all tasks to complete
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
             
+            // Assert - No exceptions should have been thrown
+            Assert.True(true);
+        }
+
+        [Fact]
+        public async Task DeferScope_ConcurrentOperations_ThreadSafe()
+        {
+            // Arrange
+            const int threadCount = 10;
+            const int operationsPerThread = 100;
+            var tasks = new Task[threadCount];
+
+            // Act - Run defer operations in parallel
+            for (int t = 0; t < threadCount; t++)
+            {
+                int threadId = t;
+                tasks[t] = Task.Run(() =>
+                {
+                    for (int i = 0; i < operationsPerThread; i++)
+                    {
+                        using var scope = new DeferScope();
+                        var allocator = new SystemMemoryAllocator();
+                        
+                        // Allocate and defer cleanup
+                        var buffer = allocator.Allocate<int>(10 + threadId);
+                        scope.Defer(() => buffer.Dispose());
+                        
+                        // Do some work with the buffer
+                        for (int j = 0; j < Math.Min(5, buffer.Length); j++)
+                        {
+                            buffer[j] = threadId * 1000 + i * 100 + j;
+                        }
+                        
+                        // Scope disposal will handle cleanup
+                    }
+                });
+            }
+
+            // Wait for all tasks to complete
+            await Task.WhenAll(tasks);
+
             // Assert - No exceptions should have been thrown
             Assert.True(true);
         }

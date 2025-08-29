@@ -131,7 +131,7 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void UnmanagedMemoryPool_ThreadSafety_Works()
+        public async Task UnmanagedMemoryPool_ThreadSafety_Works()
         {
             // Arrange
             var baseAllocator = new SystemMemoryAllocator();
@@ -159,7 +159,7 @@ namespace ZiggyAlloc.Tests
             }
 
             // Wait for all tasks to complete
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert - No exceptions should have been thrown
             // The test passes if we reach this point without exceptions

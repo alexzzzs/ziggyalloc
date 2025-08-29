@@ -29,6 +29,7 @@ namespace ZiggyAlloc
         private readonly ConcurrentDictionary<IntPtr, (int size, string key)> _bufferInfo;
         private readonly IUnmanagedMemoryAllocator _baseAllocator;
         private long _totalAllocatedBytes;
+        private bool _disposed = false;
 
         /// <summary>
         /// Gets a value indicating that this allocator supports individual memory deallocation.
@@ -60,6 +61,9 @@ namespace ZiggyAlloc
         /// <returns>A buffer representing the allocated memory</returns>
         public unsafe UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(UnmanagedMemoryPool));
+
             if (elementCount < 0)
                 throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
 
@@ -89,10 +93,23 @@ namespace ZiggyAlloc
                 
                 // Zero the memory by default when reusing from pool
                 // This ensures buffers are properly initialized and don't contain old data
-                var byteSpan = new Span<byte>((void*)pointer, sizeInBytes);
-                byteSpan.Clear();
+                if (zeroMemory || true) // Always zero when reusing from pool for safety
+                {
+                    try
+                    {
+                        var byteSpan = new Span<byte>((void*)pointer, sizeInBytes);
+                        byteSpan.Clear();
+                    }
+                    catch
+                    {
+                        // If we can't zero the memory, we should allocate a new buffer instead
+                        pointer = IntPtr.Zero;
+                    }
+                }
             }
-            else
+            
+            // If we couldn't reuse from pool or zeroing failed, allocate a new buffer
+            if (pointer == IntPtr.Zero)
             {
                 // No buffer available in pool, allocate a new one
                 var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
@@ -105,7 +122,7 @@ namespace ZiggyAlloc
             // Track buffer info for disposal
             _bufferInfo.TryAdd(pointer, (sizeInBytes, key));
 
-            return new UnmanagedBuffer<T>((T*)pointer, elementCount, this);
+            return new UnmanagedBuffer<T>((T*)pointer, elementCount, (object)this);
         }
 
         /// <summary>
@@ -114,6 +131,9 @@ namespace ZiggyAlloc
         /// <param name="pointer">The pointer to the memory to free</param>
         public void Free(IntPtr pointer)
         {
+            if (_disposed)
+                return;
+
             if (pointer == IntPtr.Zero)
                 return;
 
@@ -139,6 +159,9 @@ namespace ZiggyAlloc
         /// </summary>
         public void Clear()
         {
+            if (_disposed)
+                return;
+
             foreach (var kvp in _pools)
             {
                 if (kvp.Value is ConcurrentQueue<IntPtr> queue)
@@ -160,7 +183,11 @@ namespace ZiggyAlloc
         /// </summary>
         public void Dispose()
         {
-            Clear();
+            if (!_disposed)
+            {
+                _disposed = true;
+                Clear();
+            }
         }
     }
 }

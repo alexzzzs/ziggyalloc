@@ -153,7 +153,7 @@ namespace ZiggyAlloc
             if (!wasTracked)
             {
                 Debug.WriteLine($"[DebugMemoryAllocator '{_allocatorName}'] Warning: " +
-                              $"Attempted to free untracked pointer 0x{pointer:X}");
+                              $"Attempted to free untracked pointer 0x{pointer.ToString("X")}");
             }
 
             _backingAllocator.Free(pointer);
@@ -213,7 +213,7 @@ namespace ZiggyAlloc
 
             foreach (var (pointer, metadata) in leakedAllocations)
             {
-                reportBuilder.AppendLine($"  • Pointer: 0x{pointer:X}")
+                reportBuilder.AppendLine($"  • Pointer: 0x{pointer.ToString("X")}")
                            .AppendLine($"    Size: {metadata.SizeInBytes} bytes")
                            .AppendLine($"    Allocated at: {metadata.SourceFilePath}:{metadata.SourceLineNumber}")
                            .AppendLine($"    In method: {metadata.CallerMemberName}")

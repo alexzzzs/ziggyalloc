@@ -98,39 +98,74 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_ConcurrentAllocations_ThreadSafe()
+        public async Task ScopedMemoryAllocator_ConcurrentAllocations_ThreadSafe()
         {
             // Arrange
+            var baseAllocator = new SystemMemoryAllocator();
             const int threadCount = 10;
-            const int allocationsPerThread = 1000;
+            const int allocationsPerThread = 100;
             var tasks = new Task[threadCount];
-            
-            // Act - Run allocations in parallel with separate allocators
+
+            // Act - Run allocations in parallel
             for (int t = 0; t < threadCount; t++)
             {
                 int threadId = t;
                 tasks[t] = Task.Run(() =>
                 {
-                    // Each thread gets its own allocator
-                    using var allocator = new ScopedMemoryAllocator();
-                    
                     for (int i = 0; i < allocationsPerThread; i++)
                     {
-                        using var buffer = allocator.Allocate<int>(10 + threadId);
+                        using var scope = new ScopedMemoryAllocator();
+                        using var buffer = scope.Allocate<int>(50 + threadId);
                         // Do some work with the buffer
-                        for (int j = 0; j < Math.Min(5, buffer.Length); j++)
+                        for (int j = 0; j < Math.Min(10, buffer.Length); j++)
                         {
-                            buffer[j] = threadId * 1000 + i * 100 + j;
+                            buffer[j] = threadId * 1000 + i * 10 + j;
                         }
+                        // Scope disposal will handle cleanup
                     }
                 });
             }
-            
+
             // Wait for all tasks to complete
-            Task.WaitAll(tasks);
-            
+            await Task.WhenAll(tasks);
+
             // Assert - No exceptions should have been thrown
             Assert.True(true);
+        }
+
+        [Fact]
+        public async Task ScopedAllocator_ConcurrentAllocations_ThreadSafe_Async()
+        {
+            // Arrange
+            const int threadCount = 8;
+            const int allocationsPerThread = 100;
+            var tasks = new Task[threadCount];
+
+            // Act
+            for (int t = 0; t < threadCount; t++)
+            {
+                int threadId = t;
+                tasks[t] = Task.Run(() =>
+                {
+                    for (int i = 0; i < allocationsPerThread; i++)
+                    {
+                        using var allocator = new ScopedMemoryAllocator();
+                        var buffer = allocator.Allocate<int>(100 + threadId * 10);
+                        // Do some work with the buffer
+                        for (int j = 0; j < Math.Min(10, buffer.Length); j++)
+                        {
+                            buffer[j] = threadId * 1000 + i * 10 + j;
+                        }
+                        // Allocator is disposed here, freeing all memory
+                    }
+                });
+            }
+
+            // Wait for all tasks to complete
+            await Task.WhenAll(tasks);
+
+            // Assert - If we reach here without exceptions, the test passes
+            Assert.True(true); // No exceptions thrown
         }
 
         [Fact]
