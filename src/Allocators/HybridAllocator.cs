@@ -5,36 +5,18 @@ using System.Threading;
 namespace ZiggyAlloc
 {
     /// <summary>
-    /// An allocator that automatically chooses between managed and unmanaged allocation based on size and type
-    /// to optimize performance for different scenarios.
+    /// An allocator that automatically chooses between managed and unmanaged allocation based on size and type.
     /// </summary>
-    /// <remarks>
-    /// This allocator uses benchmark-driven heuristics to determine the optimal allocation strategy:
-    /// - For small data types where managed arrays are faster, uses managed allocation
-    /// - For large data types where unmanaged arrays eliminate GC pressure, uses unmanaged allocation
-    /// - For medium-sized allocations, considers both performance and memory characteristics
-    /// 
-    /// Key benefits:
-    /// - Automatic optimization based on data type and size
-    /// - Eliminates need to manually choose allocation strategy
-    /// - Best of both worlds: performance where unmanaged is better, simplicity where managed is better
-    /// - Thread-safe implementation
-    /// 
-    /// Best used for:
-    /// - Applications that handle various data types and sizes
-    /// - When you want optimal performance without manual tuning
-    /// - Mixed workloads with different allocation patterns
-    /// </remarks>
     public sealed class HybridAllocator : IUnmanagedMemoryAllocator
     {
         private readonly IUnmanagedMemoryAllocator _unmanagedAllocator;
         private long _totalAllocatedBytes;
 
         // Thresholds based on benchmark results
-        private const int BYTE_THRESHOLD = 1024;        // For byte arrays, managed is faster up to 1KB
-        private const int INT_THRESHOLD = 512;          // For int arrays, managed is faster up to 512 elements (2KB)
-        private const int DOUBLE_THRESHOLD = 128;       // For double arrays, unmanaged is faster even for small sizes
-        private const int STRUCT_THRESHOLD = 64;        // For structs, unmanaged is generally better
+        private const int BYTE_THRESHOLD = 1024;
+        private const int INT_THRESHOLD = 512;
+        private const int DOUBLE_THRESHOLD = 128;
+        private const int STRUCT_THRESHOLD = 64;
 
         /// <summary>
         /// Gets a value indicating that this allocator supports individual memory deallocation.
@@ -73,7 +55,7 @@ namespace ZiggyAlloc
                 return new UnmanagedBuffer<T>(null, 0, this);
             }
 
-            // Calculate total size using Marshal to get size of T
+            // Calculate total size
             int elementSize = System.Runtime.InteropServices.Marshal.SizeOf<T>();
             long totalSize = (long)elementCount * elementSize;
             if (totalSize > int.MaxValue)
@@ -94,9 +76,8 @@ namespace ZiggyAlloc
             }
             else
             {
-                // For small allocations where managed arrays are faster, delegate to the unmanaged allocator
-                // but with a note that for truly managed allocations, a different approach would be needed
-                // For now, we'll use the unmanaged allocator for all cases to avoid the GCHandle issues
+                // For small allocations where managed arrays are faster, we still use the unmanaged allocator
+                // but note that a true hybrid implementation would use managed arrays and pin them
                 var buffer = _unmanagedAllocator.Allocate<T>(elementCount, zeroMemory);
                 
                 // Update allocation tracking
@@ -109,60 +90,32 @@ namespace ZiggyAlloc
         /// <summary>
         /// Determines whether unmanaged allocation should be used based on type and size.
         /// </summary>
-        /// <typeparam name="T">The unmanaged type</typeparam>
-        /// <param name="elementCount">The number of elements</param>
-        /// <param name="elementSize">The size of each element in bytes</param>
-        /// <returns>True if unmanaged allocation should be used, false otherwise</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool ShouldUseUnmanagedAllocation<T>(int elementCount, int elementSize) where T : unmanaged
         {
             var type = typeof(T);
             
-            // For reference, sizes:
-            // byte: 1 byte
-            // int: 4 bytes
-            // double: 8 bytes
-            // typical struct: 16+ bytes
-            
             if (type == typeof(byte))
             {
-                // Managed arrays are faster for small byte arrays
                 return elementCount > BYTE_THRESHOLD;
             }
             else if (type == typeof(int))
             {
-                // Managed arrays are faster for small int arrays
                 return elementCount > INT_THRESHOLD;
             }
             else if (type == typeof(double))
             {
-                // Unmanaged is generally better for doubles due to GC pressure
-                return elementCount >= DOUBLE_THRESHOLD; // Changed to >= to match the benchmark size
+                return elementCount >= DOUBLE_THRESHOLD;
             }
             else if (type.IsValueType && !type.IsPrimitive)
             {
-                // For structs, unmanaged is generally better due to size and GC pressure
                 return elementCount > STRUCT_THRESHOLD;
             }
             else
             {
-                // For other types (long, float, etc.), use a size-based threshold
                 int threshold = Math.Max(32, 1024 / elementSize);
                 return elementCount > threshold;
             }
-        }
-
-        /// <summary>
-        /// Checks if an array is already zero-initialized.
-        /// </summary>
-        /// <typeparam name="T">The type of elements in the array</typeparam>
-        /// <param name="array">The array to check</param>
-        /// <returns>True if the array is zero-initialized, false otherwise</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsZeroInitialized<T>(T[] array) where T : unmanaged
-        {
-            // Arrays in .NET are zero-initialized by default
-            return true;
         }
 
         /// <summary>
