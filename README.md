@@ -114,7 +114,7 @@ dotnet add package ZiggyAlloc
 Or add to your `.csproj`:
 
 ```xml
-<PackageReference Include="ZiggyAlloc" Version="1.2.1" />
+<PackageReference Include="ZiggyAlloc" Version="1.2.3" />
 ```
 
 ## Documentation
