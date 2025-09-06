@@ -217,6 +217,61 @@ namespace ZiggyAlloc.Tests
             }
         }
 
+        [Fact]
+        public void UnmanagedBuffer_Dispose_MultipleTimes_Safe()
+        {
+            // Arrange
+            var allocator = new SystemMemoryAllocator();
+            var buffer = allocator.Allocate<int>(10);
+
+            // Act & Assert - Should not throw exceptions
+            buffer.Dispose();
+            buffer.Dispose(); // Second dispose should be safe
+            buffer.Dispose(); // Third dispose should be safe
+        }
+
+        [Fact]
+        public void UnmanagedBuffer_AfterDispose_AccessThrowsObjectDisposedException()
+        {
+            // Arrange
+            var allocator = new SystemMemoryAllocator();
+            var buffer = allocator.Allocate<int>(10);
+            buffer.Dispose();
+
+            // Act & Assert
+            Assert.Throws<ObjectDisposedException>(() => { var _ = buffer[0]; });
+            Assert.Throws<ObjectDisposedException>(() => { var _ = buffer.First; });
+            Assert.Throws<ObjectDisposedException>(() => { var _ = buffer.Last; });
+            Assert.Throws<ObjectDisposedException>(() => buffer.AsSpan());
+            Assert.Throws<ObjectDisposedException>(() => buffer.AsReadOnlySpan());
+            Assert.Throws<ObjectDisposedException>(() => buffer.Fill(42));
+            Assert.Throws<ObjectDisposedException>(() => buffer.Clear());
+        }
+
+        [Fact]
+        public void UnmanagedBuffer_CopyFrom_Buffer_Works()
+        {
+            // Arrange
+            var allocator = new SystemMemoryAllocator();
+            using var sourceBuffer = allocator.Allocate<int>(5);
+            using var destinationBuffer = allocator.Allocate<int>(5);
+
+            // Fill source buffer
+            for (int i = 0; i < sourceBuffer.Length; i++)
+            {
+                sourceBuffer[i] = i * 10;
+            }
+
+            // Act
+            destinationBuffer.CopyFrom(sourceBuffer);
+
+            // Assert
+            for (int i = 0; i < destinationBuffer.Length; i++)
+            {
+                Assert.Equal(i * 10, destinationBuffer[i]);
+            }
+        }
+
         public struct Point
         {
             public int X;

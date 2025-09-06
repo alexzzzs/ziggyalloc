@@ -276,12 +276,12 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Implicitly converts the buffer to a Span<T>.
+        /// Implicitly converts the buffer to a Span&lt;T&gt;.
         /// </summary>
         public static implicit operator Span<T>(UnmanagedBuffer<T> buffer) => buffer.AsSpan();
 
         /// <summary>
-        /// Implicitly converts the buffer to a ReadOnlySpan<T>.
+        /// Implicitly converts the buffer to a ReadOnlySpan&lt;T&gt;.
         /// </summary>
         public static implicit operator ReadOnlySpan<T>(UnmanagedBuffer<T> buffer) => buffer.AsReadOnlySpan();
 

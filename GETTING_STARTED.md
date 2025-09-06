@@ -79,23 +79,33 @@ Buffer info:
   Pointer: 0x1A2B3C4D5E6F
 ```
 
-## Key Concepts
+## 🧠 Core Concepts
 
-### 1. Allocators
-Choose the right allocator for your needs:
+### Memory Allocators
+
+All memory allocation in ZiggyAlloc goes through implementations of `IUnmanagedMemoryAllocator`:
 
 ```csharp
-// System allocator - high performance, manual memory management
-var system = new SystemMemoryAllocator();
-
-// Scoped allocator - automatic cleanup on scope exit
-using var scoped = new ScopedMemoryAllocator();
-
-// Debug allocator - leak detection with caller information
-using var debug = new DebugMemoryAllocator("Component", Z.DefaultAllocator);
+public interface IUnmanagedMemoryAllocator
+{
+    UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged;
+    void Free(IntPtr pointer);
+    bool SupportsIndividualDeallocation { get; }
+    long TotalAllocatedBytes { get; }
+}
 ```
 
-### 2. UnmanagedBuffer<T>
+### Available Allocators
+
+1. **SystemMemoryAllocator** - Direct system memory allocation
+2. **ScopedMemoryAllocator** - Arena-style allocator that frees all memory when disposed
+3. **DebugMemoryAllocator** - Tracks allocations and detects memory leaks with caller information
+4. **UnmanagedMemoryPool** - Reduces allocation overhead by reusing previously allocated buffers
+5. **HybridAllocator** - Automatically chooses between managed and unmanaged allocation based on size and type
+6. **SlabAllocator** - Pre-allocates large blocks and sub-allocates for high-frequency small allocations
+
+### UnmanagedBuffer<T>
+
 The core type for working with unmanaged memory:
 
 ```csharp
@@ -113,7 +123,8 @@ span.Fill(123);
 IntPtr ptr = buffer.RawPointer;
 ```
 
-### 3. Automatic Memory Management
+### Automatic Memory Management
+
 Use `using` statements for deterministic cleanup:
 
 ```csharp
@@ -124,7 +135,8 @@ using var buffer2 = allocator.Allocate<double>(500);
 // No manual Free() calls needed
 ```
 
-### 4. Memory Safety Features
+### Memory Safety Features
+
 Built-in safety without performance cost:
 
 ```csharp
@@ -242,3 +254,52 @@ defer.Defer(() => alloc.Free(ptrCopy));
 - Use DebugAllocator to catch issues early
 
 Need help? Check the [GitHub issues](https://github.com/ziggyalloc/ziggyalloc/issues) or create a new one!
+
+## 🚀 Advanced Features
+
+### Memory Pooling
+
+Reduce allocation overhead by reusing buffers:
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+using var pool = new UnmanagedMemoryPool(systemAllocator);
+
+// First allocation - creates new buffer
+using var buffer1 = pool.Allocate<int>(100);
+
+// Second allocation - reuses buffer from pool if available
+using var buffer2 = pool.Allocate<int>(100);
+
+// Buffers are returned to the pool when disposed
+```
+
+### Slab Allocation
+
+Optimize high-frequency small allocations:
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+using var slabAllocator = new SlabAllocator(systemAllocator);
+
+// Small allocations are extremely fast
+using var smallBuffer = slabAllocator.Allocate<int>(100);
+
+// Large allocations are delegated to the base allocator
+using var largeBuffer = slabAllocator.Allocate<int>(10000);
+```
+
+### Hybrid Allocation
+
+Intelligent allocation strategy selection:
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+using var hybridAllocator = new HybridAllocator(systemAllocator);
+
+// Small allocations may use managed arrays for better performance
+using var smallBuffer = hybridAllocator.Allocate<int>(100);
+
+// Large allocations will use unmanaged memory to avoid GC pressure
+using var largeBuffer = hybridAllocator.Allocate<int>(10000);
+```

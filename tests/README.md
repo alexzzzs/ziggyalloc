@@ -1,230 +1,129 @@
-# ZiggyAlloc Test Suite
+# ZiggyAlloc Tests
 
-This directory contains the comprehensive test suite for the ZiggyAlloc library. Due to resource constraints and parallel execution conflicts in the test environment, specific guidelines should be followed when running tests.
+This directory contains unit tests for the ZiggyAlloc memory management library.
 
-## 🧪 Test Suite Overview
+## 🧪 Test Organization
 
-The ZiggyAlloc test suite ensures reliability, performance, and safety across all library features. With over 130 tests covering core functionality, edge cases, and performance scenarios, the suite provides confidence in the library's robustness.
+Tests are organized by component:
 
-### Test Categories Coverage
-
-| Category | Test Count | Purpose |
-|----------|------------|---------|
-| **Allocator Tests** | 30+ | Core allocator functionality |
-| **Lifetime Tests** | 20+ | Memory lifetime and disposal |
-| **Interop Tests** | 15+ | Native interop and pointer operations |
-| **Performance Tests** | 25+ | Performance optimization verification |
-| **Safety Tests** | 20+ | Memory safety and bounds checking |
-| **Advanced Feature Tests** | 20+ | Defer, pooling, and hybrid allocation |
+- `AllocatorTests.cs` - Core allocator functionality tests
+- `UnmanagedBufferTests.cs` - UnmanagedBuffer functionality tests
+- `ScopedMemoryAllocatorTests.cs` - Scoped allocator specific tests
+- `DebugMemoryAllocatorTests.cs` - Debug allocator specific tests
+- `UnmanagedMemoryPoolTests.cs` - Memory pool specific tests
+- `HybridAllocatorTests.cs` - Hybrid allocator specific tests
+- `SlabAllocatorTests.cs` - Slab allocator specific tests (new)
+- `DeferScopeTests.cs` - Defer scope functionality tests
+- `LifetimeTests.cs` - Lifetime management tests
 
 ## 🚀 Running Tests
 
-### Recommended Approach
+### Prerequisites
 
-Due to resource constraints and parallel execution conflicts, it's recommended to run tests with limited parallelization:
+- .NET 8.0 SDK or later
+- All tests require limited parallelization due to resource constraints
 
-```bash
-# Run all tests with limited parallelization
-dotnet test tests/ZiggyAlloc.Tests.csproj -- NUnit.NumberOfTestWorkers=1
-
-# Run specific test class
-dotnet test tests/ZiggyAlloc.Tests.csproj --filter "HybridAllocatorTests" -- NUnit.NumberOfTestWorkers=1
-
-# Run tests by category
-dotnet test tests/ZiggyAlloc.Tests.csproj --filter "TestCategory!=Performance" -- NUnit.NumberOfTestWorkers=1
-```
-
-### Running Individual Test Classes
-
-For better stability and resource management, you can run specific test classes:
+### Run All Tests
 
 ```bash
-# Run allocator tests
-dotnet test tests/ZiggyAlloc.Tests.csproj --filter "AllocatorTests" -- NUnit.NumberOfTestWorkers=1
-
-# Run lifetime management tests
-dotnet test tests/ZiggyAlloc.Tests.csproj --filter "LifetimeTests" -- NUnit.NumberOfTestWorkers=1
-
-# Run specific test method
-dotnet test tests/ZiggyAlloc.Tests.csproj --filter "HybridAllocator_AllocatesSmallArraysUsingManagedMemory" -- NUnit.NumberOfTestWorkers=1
+dotnet test
 ```
 
-## 📊 Test Structure
+### Run Tests with Limited Parallelization
 
-The test suite is organized as follows:
+Due to resource constraints, tests should be run with limited parallelization:
 
-```
-tests/
-├── AllocatorTests.cs              # Core allocator tests
-├── LifetimeTests.cs               # Memory lifetime tests
-├── PointerAndSliceTests.cs        # Pointer and slice operation tests
-├── PerformanceOptimizationTests.cs # Performance tests
-├── HybridAllocatorTests.cs        # HybridAllocator specific tests
-├── ScopedMemoryAllocatorTests.cs  # ScopedMemoryAllocator tests
-├── DebugMemoryAllocatorTests.cs   # DebugMemoryAllocator tests
-├── UnmanagedBufferTests.cs        # UnmanagedBuffer tests
-├── DeferScopeTests.cs             # DeferScope tests
-├── UnmanagedMemoryPoolTests.cs    # UnmanagedMemoryPool tests
-├── Additional test files...       # Extended test scenarios
-└── README.md                      # This file
+```bash
+dotnet test -- NUnit.NumberOfTestWorkers=1
 ```
 
-## 🔍 Test Categories
+### Run Specific Test Class
 
-### Allocator Tests
-Core functionality tests for all allocator implementations:
+```bash
+dotnet test --filter "FullyQualifiedName~ZiggyAlloc.Tests.SlabAllocatorTests"
+```
 
-| Allocator | Test Coverage | Key Verifications |
-|-----------|---------------|-------------------|
-| **SystemMemoryAllocator** | ✅ Complete | Allocation, deallocation, tracking |
-| **ScopedMemoryAllocator** | ✅ Complete | Scope cleanup, multiple allocations |
-| **DebugMemoryAllocator** | ✅ Complete | Leak detection, caller tracking |
-| **UnmanagedMemoryPool** | ✅ Complete | Buffer pooling, reuse, cleanup |
-| **HybridAllocator** | ✅ Complete | Strategy selection, mixed allocations |
+### Run Specific Test Method
 
-### Performance Tests
-Performance-related tests ensuring optimizations work correctly:
+```bash
+dotnet test --filter "Name=SlabAllocator_BasicAllocation_Works"
+```
+
+## 🧠 Test Guidelines
+
+### Parallelization
+
+Tests require limited parallelization using `--NUnit.NumberOfTestWorkers=1` to avoid resource overload and test host crashes. While Task.WaitAll is commonly used for concurrent operations, it may lead to deadlocks in parallel execution. Tests should be improved by using async/await patterns instead of blocking calls to ensure better concurrency handling and avoid potential deadlocks.
+
+### Namespace Imports
+
+Test files require proper namespace imports including `using System.Linq;` to support LINQ operations and parallel test execution patterns.
+
+### Test Structure
+
+All tests follow the Arrange-Act-Assert pattern:
 
 ```csharp
 [Fact]
-public void HybridAllocator_Performance_ImprovesWithLargeAllocations()
+public void TestName()
 {
-    var systemAllocator = new SystemMemoryAllocator();
-    var hybridAllocator = new HybridAllocator(systemAllocator);
+    // Arrange
+    // Set up test data and preconditions
     
-    // Large allocation should be faster with hybrid allocator
-    var stopwatch = Stopwatch.StartNew();
-    using var largeBuffer = hybridAllocator.Allocate<double>(100000);
-    stopwatch.Stop();
+    // Act
+    // Execute the code under test
     
-    // Verify performance characteristics
-    Assert.True(stopwatch.ElapsedMilliseconds < threshold);
+    // Assert
+    // Verify the expected outcomes
 }
 ```
 
-### Safety Tests
-Memory safety and bounds checking verification:
+## 🐛 Troubleshooting
 
-- **Bounds Checking**: Ensures buffer overruns are prevented
-- **Double-Free Protection**: Prevents memory corruption from multiple disposal
-- **Leak Detection**: Verifies all allocated memory is properly freed
-- **Thread Safety**: Tests concurrent access patterns
+### Test Host Crashes
 
-### Advanced Feature Tests
-Extended scenarios for complex functionality:
-
-- **DeferScope**: Reverse-order cleanup execution
-- **Memory Pooling**: Buffer reuse and pool management
-- **Hybrid Allocation**: Strategy switching based on size/type
-- **Interop Safety**: Native pointer handling without memory corruption
-
-## 🏗️ Test Architecture
-
-```mermaid
-graph TD
-    A[Test Suite] --> B[Allocator Tests]
-    A --> C[Lifetime Tests]
-    A --> D[Interop Tests]
-    A --> E[Performance Tests]
-    A --> F[Safety Tests]
-    A --> G[Advanced Feature Tests]
-    
-    B --> H[SystemMemoryAllocator]
-    B --> I[ScopedMemoryAllocator]
-    B --> J[DebugMemoryAllocator]
-    B --> K[UnmanagedMemoryPool]
-    B --> L[HybridAllocator]
-    
-    E --> M[Allocation Performance]
-    E --> N[Pooling Benefits]
-    E --> O[Hybrid Strategy]
-    
-    F --> P[Bounds Checking]
-    F --> Q[Double-Free Protection]
-    F --> R[Leak Detection]
-    F --> S[Thread Safety]
-    
-    G --> T[DeferScope]
-    G --> U[Memory Pooling]
-    G --> V[Hybrid Allocation]
-```
-
-## 🛠️ Troubleshooting
-
-### Test Runner Crashes
-
-If you encounter test runner crashes when running the full test suite, this is typically due to resource constraints. Try running tests with limited parallelization:
+If you experience test host crashes, try running with limited parallelization:
 
 ```bash
-dotnet test tests/ZiggyAlloc.Tests.csproj -- NUnit.NumberOfTestWorkers=1
+dotnet test -- NUnit.NumberOfTestWorkers=1
 ```
 
-### Resource Constraints
+### Missing Dependencies
 
-Some tests create large memory allocations or run concurrent operations. If you're experiencing issues:
-
-1. **Run smaller test groups at a time**
-2. **Use limited parallelization**
-3. **Ensure adequate system memory is available**
-4. **Close other memory-intensive applications**
-
-### Common Issues and Solutions
-
-| Issue | Solution | Command |
-|-------|----------|---------|
-| **OutOfMemoryException** | Run tests with limited parallelization | `-- NUnit.NumberOfTestWorkers=1` |
-| **Test Hangs** | Increase timeout or run single-threaded | `-- NUnit.NumberOfTestWorkers=1` |
-| **Intermittent Failures** | Run tests multiple times or isolate failing tests | `--filter "SpecificTestName"` |
-| **Performance Test Failures** | Run on less loaded system | Close other applications |
-
-## 🔄 Continuous Integration
-
-The GitHub Actions CI workflow runs tests with specific configurations to ensure stability:
+Ensure all dependencies are restored:
 
 ```bash
-dotnet test tests/ZiggyAlloc.Tests.csproj -- NUnit.NumberOfTestWorkers=1
+dotnet restore
 ```
 
-This approach ensures that tests run reliably in both development and CI environments.
+### Compilation Errors
 
-### CI Test Matrix
+Check for missing namespace imports or incorrect references.
 
-| Environment | .NET Version | Status |
-|-------------|--------------|--------|
-| **Windows** | .NET 9.0 | ✅ Stable |
-| **Linux** | .NET 9.0 | ✅ Stable |
-| **macOS** | .NET 9.0 | ✅ Stable |
+## 🔄 CI/CD Integration
 
-## 📈 Test Results Monitoring
+Tests are automatically run in the GitHub Actions CI/CD pipeline. The pipeline uses:
 
-Tests provide detailed metrics for performance and memory usage:
-
-- **Execution Time**: Nanoseconds per operation
-- **Memory Allocated**: Bytes allocated per test
-- **GC Collections**: Garbage collections triggered
-- **Thread Safety**: Concurrent access verification
-
-### Example Test Output
-```
-Test Results:
-  Passed: 139
-  Failed: 0
-  Skipped: 0
-  Total: 139
-  Duration: 2s
+```bash
+dotnet test -- NUnit.NumberOfTestWorkers=1
 ```
 
-## 🎯 Best Practices for Testing
+To ensure stable test execution.
 
-1. **Always run with limited parallelization** in resource-constrained environments
-2. **Test both small and large allocations** to verify performance characteristics
-3. **Verify memory cleanup** using DebugMemoryAllocator in development
-4. **Test concurrent scenarios** to ensure thread safety
-5. **Monitor performance metrics** to catch regressions
+## 📊 Test Coverage
 
-## 📖 Related Documentation
+Current test coverage includes:
 
-- [Main README](../README.md)
-- [Benchmarks](../benchmarks/README.md)
-- [Examples](../examples/README.md)
-- [API Documentation](../DOCUMENTATION.md)
+1. **Functional Tests** - All allocator types and core functionality
+2. **Edge Case Tests** - Boundary conditions and error handling
+3. **Performance Tests** - Allocation performance and memory usage
+4. **Thread Safety Tests** - Concurrent access scenarios
+5. **Memory Leak Tests** - Proper cleanup and disposal
+
+## 🎯 Best Practices
+
+1. **Isolation** - Each test should be independent and not rely on shared state
+2. **Speed** - Tests should execute quickly to enable rapid development cycles
+3. **Clarity** - Test names should clearly describe what is being tested
+4. **Coverage** - Tests should cover both happy paths and error conditions
+5. **Maintenance** - Tests should be easy to update when implementation changes

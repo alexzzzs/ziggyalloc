@@ -76,6 +76,8 @@ namespace ZiggyAlloc.Examples
             Examples.Advanced.MemoryLeakDetection.Run();
             Console.WriteLine();
             Examples.Advanced.DeferPatterns.Run();
+            Console.WriteLine();
+            Examples.Advanced.SlabAllocatorExample.Run();
         }
         
         static void RunAllocatorExamples()

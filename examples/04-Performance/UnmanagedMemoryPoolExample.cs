@@ -1,87 +1,115 @@
 using System;
-using System.Diagnostics;
+using System.Threading.Tasks;
 using ZiggyAlloc;
 
 namespace ZiggyAlloc.Examples.Performance
 {
     /// <summary>
-    /// Example demonstrating the performance benefits of UnmanagedMemoryPool
-    /// for frequent allocations of similar-sized buffers.
+    /// Example demonstrating the UnmanagedMemoryPool for reducing allocation overhead.
     /// </summary>
     public class UnmanagedMemoryPoolExample
     {
         public static void Run()
         {
-            Console.WriteLine("=== UnmanagedMemoryPool Performance Example ===\n");
+            Console.WriteLine("=== UnmanagedMemoryPool Example ===\n");
 
+            // Create a system allocator and wrap it in a pool
             var systemAllocator = new SystemMemoryAllocator();
-            
-            // Compare regular allocations vs pooled allocations
-            Console.WriteLine("1. Comparing regular vs pooled allocations:");
-            
-            // Regular allocations
-            var regularStopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < 1000; i++)
-            {
-                using var buffer = systemAllocator.Allocate<int>(100);
-                // Simulate some work
-                buffer[0] = i;
-            }
-            regularStopwatch.Stop();
-            
-            // Pooled allocations
             using var pool = new UnmanagedMemoryPool(systemAllocator);
-            var pooledStopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < 1000; i++)
-            {
-                using var buffer = pool.Allocate<int>(100);
-                // Simulate some work
-                buffer[0] = i;
-            }
-            pooledStopwatch.Stop();
-            
-            Console.WriteLine($"   Regular allocations: {regularStopwatch.ElapsedMilliseconds} ms");
-            Console.WriteLine($"   Pooled allocations:  {pooledStopwatch.ElapsedMilliseconds} ms");
-            Console.WriteLine($"   Performance improvement: {(double)regularStopwatch.ElapsedMilliseconds / pooledStopwatch.ElapsedMilliseconds:F2}x\n");
 
-            // Demonstrate pool warming
-            Console.WriteLine("2. Pool warming example:");
-            Console.WriteLine("   Pre-allocating buffers to avoid allocation overhead...");
-            
-            // Warm up the pool with buffers of various sizes
-            var warmupStopwatch = Stopwatch.StartNew();
-            var warmupBuffers = new UnmanagedBuffer<byte>[100];
-            for (int i = 0; i < 100; i++)
+            // Example 1: Basic pooling
+            Console.WriteLine("1. Basic Pooling:");
+            using (var buffer1 = pool.Allocate<byte>(1024))
             {
-                warmupBuffers[i] = pool.Allocate<byte>(50);
-            }
-            
-            // Return buffers to pool
-            for (int i = 0; i < 100; i++)
-            {
-                warmupBuffers[i].Dispose();
-            }
-            warmupStopwatch.Stop();
-            
-            Console.WriteLine($"   Warmed up pool with 100 buffers in {warmupStopwatch.ElapsedMilliseconds} ms");
-            
-            // Now allocate from the warmed pool
-            var warmedStopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < 100; i++)
-            {
-                using var buffer = pool.Allocate<byte>(50);
-                buffer[0] = (byte)(i % 256);
-            }
-            warmedStopwatch.Stop();
-            
-            Console.WriteLine($"   Allocated 100 buffers from warmed pool in {warmedStopwatch.ElapsedMilliseconds} ms\n");
+                // Use buffer1
+                buffer1.Fill(42);
+                Console.WriteLine($"   Allocated {buffer1.Length} bytes, first value: {buffer1[0]}");
+            } // Buffer returned to pool when disposed
 
-            // Show pool statistics
-            Console.WriteLine("3. Pool statistics:");
-            Console.WriteLine($"   Total allocated by pool: {pool.TotalAllocatedBytes:N0} bytes");
-            Console.WriteLine($"   Supports individual deallocation: {pool.SupportsIndividualDeallocation}");
-            
-            Console.WriteLine("\nUnmanagedMemoryPool helps reduce allocation overhead by reusing previously allocated buffers.");
+            // Second allocation of same size reuses from pool
+            using (var buffer2 = pool.Allocate<byte>(1024))
+            {
+                Console.WriteLine($"   Reused buffer from pool, first value: {buffer2[0]} (should be 0)");
+            }
+            Console.WriteLine();
+
+            // Example 2: Performance comparison
+            Console.WriteLine("2. Performance Comparison:");
+            PerformanceComparison();
+            Console.WriteLine();
+
+            // Example 3: Thread safety
+            Console.WriteLine("3. Thread Safety:");
+            ThreadSafetyExample();
+            Console.WriteLine();
+
+            Console.WriteLine($"Total allocated bytes: {pool.TotalAllocatedBytes:N0}");
+        }
+
+        static void PerformanceComparison()
+        {
+            var systemAllocator = new SystemMemoryAllocator();
+            using var pool = new UnmanagedMemoryPool(systemAllocator);
+
+            const int iterations = 1000;
+            const int bufferSize = 1024;
+
+            // Without pooling - each allocation calls into the OS
+            var stopwatch1 = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < iterations; i++)
+            {
+                using var buffer = systemAllocator.Allocate<byte>(bufferSize);
+                // Process buffer...
+            }
+            stopwatch1.Stop();
+
+            // With pooling - first allocation per size calls OS, subsequent allocations reuse
+            var stopwatch2 = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < iterations; i++)
+            {
+                using var buffer = pool.Allocate<byte>(bufferSize);
+                // Process buffer...
+            }
+            stopwatch2.Stop();
+
+            Console.WriteLine($"   System allocator: {stopwatch1.ElapsedMilliseconds} ms");
+            Console.WriteLine($"   Pooled allocator: {stopwatch2.ElapsedMilliseconds} ms");
+            Console.WriteLine($"   Performance improvement: {(double)stopwatch1.ElapsedMilliseconds / stopwatch2.ElapsedMilliseconds:F2}x");
+        }
+
+        static void ThreadSafetyExample()
+        {
+            var systemAllocator = new SystemMemoryAllocator();
+            using var pool = new UnmanagedMemoryPool(systemAllocator);
+
+            // Run allocations in parallel
+            var tasks = new Task[10];
+            for (int t = 0; t < tasks.Length; t++)
+            {
+                int taskId = t;
+                tasks[t] = Task.Run(() =>
+                {
+                    for (int i = 0; i < 100; i++)
+                    {
+                        using var buffer = pool.Allocate<int>(10 + taskId);
+                        // Do some work with the buffer
+                        for (int j = 0; j < Math.Min(5, buffer.Length); j++)
+                        {
+                            buffer[j] = taskId * 1000 + i * 100 + j;
+                        }
+                    }
+                });
+            }
+
+            try
+            {
+                Task.WaitAll(tasks);
+                Console.WriteLine("   All parallel allocations completed successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"   Error in parallel allocations: {ex.Message}");
+            }
         }
     }
 }

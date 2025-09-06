@@ -200,6 +200,34 @@ using var largeBuffer = hybridAllocator.Allocate<int>(10000);
 
 **Thread Safety:** ✅ Thread-safe
 
+### SlabAllocator
+
+A slab allocator that pre-allocates large blocks of memory and sub-allocates from them. This allocator is particularly efficient for scenarios with many small, similarly-sized allocations.
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+var slabAllocator = new SlabAllocator(systemAllocator);
+
+// Small allocations are served from pre-allocated slabs
+using var smallBuffer = slabAllocator.Allocate<int>(100);
+
+// Large allocations are delegated to the base allocator
+using var largeBuffer = slabAllocator.Allocate<int>(10000);
+```
+
+**Key Benefits:**
+- Extremely fast allocation/deallocation for small objects
+- Zero fragmentation within slabs
+- Reduced system call overhead
+- Better cache locality
+
+**Use Cases:**
+- High-frequency small allocations of similar sizes
+- Performance-critical code paths
+- Scenarios where allocation patterns are predictable
+
+**Thread Safety:** ✅ Thread-safe
+
 ## UnmanagedBuffer<T>
 
 The core type for working with unmanaged memory in ZiggyAlloc.
@@ -488,6 +516,29 @@ public sealed class HybridAllocator : IUnmanagedMemoryAllocator
 }
 ```
 
+### SlabAllocator
+
+```csharp
+public sealed class SlabAllocator : IUnmanagedMemoryAllocator, IDisposable
+{
+    // Constructor
+    public SlabAllocator(IUnmanagedMemoryAllocator baseAllocator, int slabSize = 1024 * 1024);
+    
+    // Allocate memory using slab allocation for small requests
+    public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false);
+    
+    // Free memory (delegated to base allocator)
+    public void Free(IntPtr pointer);
+    
+    // Properties
+    public bool SupportsIndividualDeallocation { get; }
+    public long TotalAllocatedBytes { get; }
+    
+    // Dispose the allocator
+    public void Dispose();
+}
+```
+
 ## Best Practices
 
 ### 1. Choose the Right Allocator
@@ -501,6 +552,9 @@ using var scoped = new ScopedMemoryAllocator();
 
 // For development and debugging
 using var debug = new DebugMemoryAllocator("Component", Z.DefaultAllocator);
+
+// For frequent allocations of similar sizes
+using var slab = new SlabAllocator(Z.DefaultAllocator);
 ```
 
 ### 2. Always Use `using` Statements
@@ -596,6 +650,21 @@ var hybridAllocator = new HybridAllocator(Z.DefaultAllocator);
 // Allocation strategy chosen automatically based on benchmarks
 using var smallBuffer = hybridAllocator.Allocate<byte>(100);   // May use managed
 using var largeBuffer = hybridAllocator.Allocate<double>(1000); // Will use unmanaged
+```
+
+### 9. Use SlabAllocator for High-Frequency Small Allocations
+
+```csharp
+// For scenarios with many small, similarly-sized allocations
+using var slabAllocator = new SlabAllocator(Z.DefaultAllocator);
+
+// High-frequency allocations benefit from slab allocation
+for (int i = 0; i < 10000; i++)
+{
+    using var buffer = slabAllocator.Allocate<byte>(256);
+    // Process buffer...
+    // Buffer returned to slab when disposed
+}
 ```
 
 ## Performance Considerations
@@ -708,6 +777,33 @@ using var largeBytes = hybrid.Allocate<byte>(10000);
 
 // Any double array - will use unmanaged allocation to avoid GC pressure
 using var anyDoubles = hybrid.Allocate<double>(100);
+```
+
+### SlabAllocator
+
+The SlabAllocator pre-allocates large memory blocks (slabs) and divides them into fixed-size slots for small allocations. This approach provides:
+
+1. **Extremely Fast Allocation**: For small, predictable allocations
+2. **Zero Fragmentation**: Within individual slabs
+3. **Reduced System Calls**: Fewer calls to the OS memory manager
+4. **Better Cache Locality**: Related allocations are close in memory
+
+```csharp
+// Without slab allocation - each small allocation calls into the OS
+var allocator = new SystemMemoryAllocator();
+for (int i = 0; i < 10000; i++)
+{
+    using var buffer = allocator.Allocate<byte>(256); // System call each time
+    // Process buffer...
+}
+
+// With slab allocation - slabs are pre-allocated, small allocations are fast
+using var slabAllocator = new SlabAllocator(allocator);
+for (int i = 0; i < 10000; i++)
+{
+    using var buffer = slabAllocator.Allocate<byte>(256); // Fast slab allocation
+    // Process buffer...
+}
 ```
 
 ## Common Patterns

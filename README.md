@@ -64,26 +64,29 @@ Different allocators for different use cases:
 | **DebugMemoryAllocator** | Development/testing | ✅ Safe | ❌ None | ⚡ Medium |
 | **UnmanagedMemoryPool** | Frequent allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
 | **HybridAllocator** | Mixed workloads | ✅ Safe | ⚡ Adaptive | ⚡⚡ Very High |
+| **SlabAllocator** | High-frequency small allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
 
 ## 🏗️ Architecture Overview
 
-```mermaid
+```
 graph TD
     A[IUnmanagedMemoryAllocator] --> B[SystemMemoryAllocator]
     A --> C[ScopedMemoryAllocator]
     A --> D[DebugMemoryAllocator]
     A --> E[UnmanagedMemoryPool]
     A --> F[HybridAllocator]
+    A --> G[SlabAllocator]
     
-    B --> G[Native Memory]
+    B --> H[Native Memory]
     C --> B
     D --> B
     E --> B
     F --> B
+    G --> B
     
-    H[UnmanagedBuffer<T>] --> I[Bounds Checking]
-    H --> J[Automatic Cleanup]
-    H --> K[Span<T> Integration]
+    I[UnmanagedBuffer<T>] --> J[Bounds Checking]
+    I --> K[Automatic Cleanup]
+    I --> L[Span<T> Integration]
 ```
 
 ## 🧠 Core Concepts
@@ -121,6 +124,32 @@ Reduces allocation overhead by reusing previously allocated buffers.
 
 #### HybridAllocator
 Automatically chooses between managed and unmanaged allocation based on size and type for optimal performance.
+
+#### SlabAllocator
+
+A slab allocator that pre-allocates large blocks of memory and sub-allocates from them. This allocator is particularly efficient for scenarios with many small, similarly-sized allocations.
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+using var slabAllocator = new SlabAllocator(systemAllocator);
+
+// Small allocations are served from pre-allocated slabs
+using var smallBuffer = slabAllocator.Allocate<int>(100);
+
+// Large allocations are delegated to the base allocator
+using var largeBuffer = slabAllocator.Allocate<int>(10000);
+```
+
+**Key Benefits:**
+- Extremely fast allocation/deallocation for small objects
+- Zero fragmentation within slabs
+- Reduced system call overhead
+- Better cache locality
+
+**Use Cases:**
+- High-frequency small allocations of similar sizes
+- Performance-critical code paths
+- Scenarios where allocation patterns are predictable
 
 ## 🚀 Advanced Features
 
@@ -238,7 +267,7 @@ dotnet add package ZiggyAlloc
 Or add to your `.csproj`:
 
 ```xml
-<PackageReference Include="ZiggyAlloc" Version="1.2.2" />
+<PackageReference Include="ZiggyAlloc" Version="1.2.5" />
 ```
 
 ## 📖 Documentation

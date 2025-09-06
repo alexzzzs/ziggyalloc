@@ -5,6 +5,23 @@ All notable changes to ZiggyAlloc will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2025-09-06
+
+### Added
+- **SlabAllocator** - New allocator optimized for high-frequency small allocations by pre-allocating large memory blocks (slabs) and dividing them into fixed-size slots
+- **Comprehensive Tests** - Enhanced test coverage including new tests for SlabAllocator with thread safety verification
+- **Performance Examples** - Added examples demonstrating UnmanagedMemoryPool and SlabAllocator performance benefits
+- **Test Documentation** - Created comprehensive README.md in tests directory with guidelines for running tests
+
+### Changed
+- **Documentation** - Enhanced README.md, DOCUMENTATION.md, and GETTING_STARTED.md with information about SlabAllocator and updated allocator comparison table
+- **API Reference** - Improved XML documentation for IUnmanagedMemoryAllocator with detailed examples and exception information
+- **Test Infrastructure** - Fixed XML comment warnings and IDisposable usage in tests
+
+### Fixed
+- **XML Comments** - Resolved XML comment formatting issues in UnmanagedBuffer.cs that were causing build warnings
+- **Test Code** - Fixed IDisposable usage in tests to properly handle SystemMemoryAllocator
+
 ## [1.2.4] - 2025-09-06
 
 ### Changed
