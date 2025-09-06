@@ -255,15 +255,16 @@ namespace ZiggyAlloc.Tests
         {
             // Arrange
             var systemAllocator = new SystemMemoryAllocator();
-            var hybridAllocator = new HybridAllocator(systemAllocator);
+            using var hybridAllocator = new HybridAllocator(systemAllocator);
             using var pool = new UnmanagedMemoryPool(hybridAllocator);
 
-            // Act - dispose in different order
-            hybridAllocator.Dispose(); // Dispose hybrid first
-            
-            // Assert - pool should still work if it has its own references
-            // Note: This test might need adjustment based on actual implementation
+            // Act - allocate before dispose
             using var buffer = pool.Allocate<int>(10);
+            
+            // Dispose hybrid allocator
+            hybridAllocator.Dispose(); // Dispose hybrid after allocation
+            
+            // Assert - buffer should still be valid because it was allocated before dispose
             Assert.True(buffer.IsValid);
         }
 

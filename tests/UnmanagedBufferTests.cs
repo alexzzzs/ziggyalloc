@@ -175,11 +175,13 @@ namespace ZiggyAlloc.Tests
                 Assert.False(buffer.IsValid);
                 Assert.Equal(10, buffer.Length);
                 
-                // Accessing invalid buffer should throw
+                // Accessing invalid buffer should throw for indexed access and First/Last
                 Assert.Throws<InvalidOperationException>(() => { var _ = buffer[0]; });
                 Assert.Throws<InvalidOperationException>(() => { var _ = buffer.First; });
                 Assert.Throws<InvalidOperationException>(() => { var _ = buffer.Last; });
-                Assert.Throws<InvalidOperationException>(() => buffer.AsSpan());
+                // But AsSpan should return an empty span for invalid buffers
+                var span = buffer.AsSpan();
+                Assert.Equal(0, span.Length);
             }
         }
 

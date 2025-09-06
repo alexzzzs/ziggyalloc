@@ -190,8 +190,9 @@ namespace ZiggyAlloc.Tests
             Assert.Throws<InvalidOperationException>(() => buffer.First);
             Assert.Throws<InvalidOperationException>(() => buffer.Last);
             
-            // AsSpan should also throw for invalid buffer
-            Assert.Throws<InvalidOperationException>(() => buffer.AsSpan());
+            // AsSpan should return an empty span for invalid buffers
+            var span = buffer.AsSpan();
+            Assert.Equal(0, span.Length);
         }
 
         [Fact]

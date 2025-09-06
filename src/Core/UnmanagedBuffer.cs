@@ -15,6 +15,7 @@ namespace ZiggyAlloc
         private IUnmanagedMemoryAllocator? _allocator;
         private object? _pool; // Reference to the pool that owns this buffer
         private object? _managedArrayInfo; // Reference to managed array info for hybrid allocator
+        private object? _slabSlot; // Reference to slab slot for slab allocator
         private bool _ownsMemory;
         private bool _disposed = false;
 
@@ -92,6 +93,21 @@ namespace ZiggyAlloc
             _allocator = null;
             _pool = null;
             _managedArrayInfo = managedArrayInfo;
+            _slabSlot = null;
+            _ownsMemory = true;
+        }
+
+        /// <summary>
+        /// Internal constructor for slab slot buffers from SlabAllocator.
+        /// </summary>
+        internal UnmanagedBuffer(T* pointer, int length, SlabAllocator.SlabSlot slabSlot)
+        {
+            _pointer = pointer;
+            _length = length;
+            _allocator = null;
+            _pool = null;
+            _managedArrayInfo = null;
+            _slabSlot = slabSlot;
             _ownsMemory = true;
         }
 
@@ -271,6 +287,15 @@ namespace ZiggyAlloc
                     if (info.Handle.IsAllocated)
                     {
                         info.Handle.Free();
+                    }
+                }
+                else if (_slabSlot != null)
+                {
+                    // For slab slot buffers, we don't actually free the memory,
+                    // but return it to the slab instead
+                    if (_slabSlot is SlabAllocator.SlabSlot slabSlot)
+                    {
+                        slabSlot.Free();
                     }
                 }
             }

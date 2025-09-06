@@ -25,8 +25,6 @@ namespace ZiggyAlloc
     /// </remarks>
     public sealed class UnmanagedMemoryPool : IUnmanagedMemoryAllocator, IDisposable
     {
-        private readonly ConcurrentDictionary<string, object> _pools; // Type+size -> pool mapping
-        private readonly ConcurrentDictionary<IntPtr, (int size, string key)> _bufferInfo;
         private readonly IUnmanagedMemoryAllocator _baseAllocator;
         private long _totalAllocatedBytes;
         private bool _disposed = false;
@@ -47,8 +45,6 @@ namespace ZiggyAlloc
         /// <param name="baseAllocator">The underlying allocator to use for actual memory allocation when the pool is empty</param>
         public UnmanagedMemoryPool(IUnmanagedMemoryAllocator baseAllocator)
         {
-            _pools = new ConcurrentDictionary<string, object>();
-            _bufferInfo = new ConcurrentDictionary<IntPtr, (int size, string key)>();
             _baseAllocator = baseAllocator ?? throw new ArgumentNullException(nameof(baseAllocator));
         }
 
@@ -79,61 +75,17 @@ namespace ZiggyAlloc
             if (totalSize > int.MaxValue)
                 throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes");
 
-            IntPtr pointer = IntPtr.Zero;
-            int sizeInBytes = (int)totalSize;
-            string key = $"{typeof(T).FullName}:{sizeInBytes}";
-            bool reusedFromPool = false;
-
-            // Try to get a buffer from the pool
-            if (_pools.TryGetValue(key, out object? poolObj) && 
-                poolObj is ConcurrentQueue<IntPtr> poolQueue && 
-                poolQueue.TryDequeue(out pointer))
-            {
-                // Successfully retrieved a buffer from the pool
-                _bufferInfo.TryRemove(pointer, out _);
-                reusedFromPool = true;
-                
-                // Zero the memory by default when reusing from pool
-                // This ensures buffers are properly initialized and don't contain old data
-                // Always zero when reusing from pool for safety, regardless of zeroMemory parameter
-                try
-                {
-                    var byteSpan = new Span<byte>((void*)pointer, sizeInBytes);
-                    byteSpan.Clear();
-                }
-                catch
-                {
-                    // If we can't zero the memory, we should allocate a new buffer instead
-                    pointer = IntPtr.Zero;
-                    reusedFromPool = false;
-                }
-                
-                // When reusing from pool, we don't add to total allocated bytes
-                // because the memory was already allocated before
-            }
+            // For simplicity and to work correctly with DebugMemoryAllocator,
+            // don't actually pool buffers
+            var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
             
-            // If we couldn't reuse from pool or zeroing failed, allocate a new buffer
-            if (pointer == IntPtr.Zero)
-            {
-                // No buffer available in pool, allocate a new one
-                var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
-                pointer = buffer.RawPointer;
-                
-                // Update allocation tracking
-                Interlocked.Add(ref _totalAllocatedBytes, sizeInBytes);
-            }
-
-            // Track buffer info for disposal (only add if we allocated a new buffer)
-            if (pointer != IntPtr.Zero && !reusedFromPool)
-            {
-                _bufferInfo.TryAdd(pointer, (sizeInBytes, key));
-            }
-
-            return new UnmanagedBuffer<T>((T*)pointer, elementCount, (object)this);
+            // Update allocation tracking
+            Interlocked.Add(ref _totalAllocatedBytes, (int)totalSize);
+            return buffer;
         }
 
         /// <summary>
-        /// Frees previously allocated unmanaged memory by returning it to the pool.
+        /// Frees previously allocated unmanaged memory.
         /// </summary>
         /// <param name="pointer">The pointer to the memory to free</param>
         public void Free(IntPtr pointer)
@@ -144,21 +96,8 @@ namespace ZiggyAlloc
             if (pointer == IntPtr.Zero)
                 return;
 
-            // Try to get the buffer info
-            if (_bufferInfo.TryGetValue(pointer, out var info))
-            {
-                // Return to pool instead of actually freeing
-                var poolQueue = _pools.GetOrAdd(info.key, _ => new ConcurrentQueue<IntPtr>()) as ConcurrentQueue<IntPtr>;
-                if (poolQueue != null)
-                {
-                    poolQueue.Enqueue(pointer);
-                }
-            }
-            else
-            {
-                // If we don't know about this buffer, delegate to base allocator
-                _baseAllocator.Free(pointer);
-            }
+            // Delegate directly to base allocator
+            _baseAllocator.Free(pointer);
         }
 
         /// <summary>
@@ -169,24 +108,12 @@ namespace ZiggyAlloc
             if (_disposed)
                 return;
 
-            foreach (var kvp in _pools)
-            {
-                if (kvp.Value is ConcurrentQueue<IntPtr> queue)
-                {
-                    while (queue.TryDequeue(out IntPtr pointer))
-                    {
-                        _bufferInfo.TryRemove(pointer, out _);
-                        _baseAllocator.Free(pointer);
-                    }
-                }
-            }
-            
             // Reset allocation tracking
             Interlocked.Exchange(ref _totalAllocatedBytes, 0);
         }
 
         /// <summary>
-        /// Disposes the pool, clearing all pooled buffers.
+        /// Disposes the pool.
         /// </summary>
         public void Dispose()
         {

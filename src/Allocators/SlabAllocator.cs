@@ -226,7 +226,7 @@ namespace ZiggyAlloc
         /// <summary>
         /// Represents a large block of memory divided into fixed-size slots.
         /// </summary>
-        private class Slab : IDisposable
+        public class Slab : IDisposable
         {
             private readonly UnmanagedBuffer<byte> _buffer;
             private readonly int _slotSize;
@@ -286,6 +286,7 @@ namespace ZiggyAlloc
                 if (!_disposed)
                 {
                     _disposed = true;
+                    // Dispose the buffer to properly free memory and notify tracking allocators
                     _buffer.Dispose();
                 }
             }
@@ -294,7 +295,7 @@ namespace ZiggyAlloc
         /// <summary>
         /// Represents a slot within a slab.
         /// </summary>
-        private class SlabSlot
+        public class SlabSlot
         {
             public IntPtr Pointer { get; }
             private readonly Slab _slab;
@@ -305,6 +306,14 @@ namespace ZiggyAlloc
                 Pointer = pointer;
                 _slab = slab;
                 _slotIndex = slotIndex;
+            }
+
+            /// <summary>
+            /// Frees the slot back to the slab.
+            /// </summary>
+            public void Free()
+            {
+                _slab.FreeSlot(_slotIndex);
             }
         }
     }
