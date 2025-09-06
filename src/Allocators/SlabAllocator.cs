@@ -243,7 +243,7 @@ namespace ZiggyAlloc
                 _slotInUse = new bool[_slotCount];
             }
 
-            public bool TryAllocateSlot(out SlabSlot slot)
+            public bool TryAllocateSlot(out SlabSlot? slot)
             {
                 slot = null;
 

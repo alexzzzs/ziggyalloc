@@ -151,7 +151,7 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts the buffer to a Span<T> for high-performance operations.
+        /// Converts the buffer to a Span&lt;T&gt; for high-performance operations.
         /// </summary>
         public Span<T> AsSpan()
         {
@@ -164,7 +164,7 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts a portion of the buffer to a Span<T>.
+        /// Converts a portion of the buffer to a Span&lt;T&gt;.
         /// </summary>
         public Span<T> AsSpan(int start, int length)
         {
@@ -187,7 +187,7 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts the buffer to a ReadOnlySpan<T>.
+        /// Converts the buffer to a ReadOnlySpan&lt;T&gt;.
         /// </summary>
         public ReadOnlySpan<T> AsReadOnlySpan()
         {

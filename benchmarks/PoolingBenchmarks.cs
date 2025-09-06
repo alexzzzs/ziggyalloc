@@ -15,8 +15,8 @@ namespace ZiggyAlloc.Benchmarks
         private const int BufferSize = 1024;
         private const int IterationCount = 100; // Reduced from 1000 to speed up execution
         
-        private SystemMemoryAllocator _systemAllocator;
-        private UnmanagedMemoryPool _pooledAllocator;
+        private SystemMemoryAllocator? _systemAllocator;
+        private UnmanagedMemoryPool? _pooledAllocator;
         
         [GlobalSetup]
         public void Setup()
@@ -36,7 +36,7 @@ namespace ZiggyAlloc.Benchmarks
         {
             for (int i = 0; i < IterationCount; i++)
             {
-                using var buffer = _systemAllocator.Allocate<byte>(BufferSize);
+                using var buffer = _systemAllocator!.Allocate<byte>(BufferSize);
                 // Simulate some work
                 buffer[0] = 1;
             }
@@ -47,7 +47,7 @@ namespace ZiggyAlloc.Benchmarks
         {
             for (int i = 0; i < IterationCount; i++)
             {
-                using var buffer = _pooledAllocator.Allocate<byte>(BufferSize);
+                using var buffer = _pooledAllocator!.Allocate<byte>(BufferSize);
                 // Simulate some work
                 buffer[0] = 1;
             }
@@ -60,7 +60,7 @@ namespace ZiggyAlloc.Benchmarks
             var prewarmBuffers = new UnmanagedBuffer<byte>[10];
             for (int i = 0; i < 10; i++)
             {
-                prewarmBuffers[i] = _pooledAllocator.Allocate<byte>(BufferSize);
+                prewarmBuffers[i] = _pooledAllocator!.Allocate<byte>(BufferSize);
             }
             
             for (int i = 0; i < 10; i++)
@@ -71,7 +71,7 @@ namespace ZiggyAlloc.Benchmarks
             // Now run the benchmark
             for (int i = 0; i < IterationCount; i++)
             {
-                using var buffer = _pooledAllocator.Allocate<byte>(BufferSize);
+                using var buffer = _pooledAllocator!.Allocate<byte>(BufferSize);
                 // Simulate some work
                 buffer[0] = 1;
             }

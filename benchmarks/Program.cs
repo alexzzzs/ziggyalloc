@@ -13,8 +13,12 @@ namespace ZiggyAlloc.Benchmarks
             Console.WriteLine("====================");
             
             // Use BenchmarkSwitcher to allow filtering
-            var switcher = new BenchmarkSwitcher(Assembly.GetEntryAssembly());
-            switcher.Run(args);
+            var assembly = Assembly.GetEntryAssembly();
+            if (assembly != null)
+            {
+                var switcher = new BenchmarkSwitcher(assembly);
+                switcher.Run(args);
+            }
             
             Console.WriteLine("Benchmarks completed!");
         }

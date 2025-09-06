@@ -268,8 +268,8 @@ namespace ZiggyAlloc.Tests
             Assert.True(exceptionThrown);
             
             // Both cleanup actions should have executed despite the exception
-            Assert.True(executionOrder.Contains("cleanup1"));
-            Assert.True(executionOrder.Contains("cleanup2"));
+            Assert.Contains("cleanup1", executionOrder);
+            Assert.Contains("cleanup2", executionOrder);
         }
 
         [Fact]

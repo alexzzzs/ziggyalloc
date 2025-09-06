@@ -8,7 +8,7 @@ namespace ZiggyAlloc
     /// <summary>
     /// A memory allocator that uses the system's native memory allocation functions.
     /// </summary>
-    public sealed class SystemMemoryAllocator : IUnmanagedMemoryAllocator
+    public sealed class SystemMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
         private const int STACK_ALLOC_THRESHOLD = 1024; // 1KB
         private long _totalAllocatedBytes = 0;
@@ -112,6 +112,14 @@ namespace ZiggyAlloc
             {
                 return new UnmanagedBuffer<T>(pointer, span.Length);
             }
+        }
+
+        /// <summary>
+        /// Disposes the allocator. SystemMemoryAllocator doesn't hold any resources that need disposal.
+        /// </summary>
+        public void Dispose()
+        {
+            // SystemMemoryAllocator doesn't hold any resources that need disposal
         }
     }
 }
