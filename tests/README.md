@@ -15,6 +15,9 @@ Tests are organized by component:
 - `SlabAllocatorTests.cs` - Slab allocator specific tests (new)
 - `DeferScopeTests.cs` - Defer scope functionality tests
 - `LifetimeTests.cs` - Lifetime management tests
+- `AllocatorEdgeCaseTests.cs` - Comprehensive edge case tests for all allocator types
+- `AllocatorIntegrationTests.cs` - Integration tests between different allocator types
+- `PerformanceRegressionTests.cs` - Performance regression tests to monitor for performance degradation
 
 ## 🚀 Running Tests
 
@@ -119,6 +122,8 @@ Current test coverage includes:
 3. **Performance Tests** - Allocation performance and memory usage
 4. **Thread Safety Tests** - Concurrent access scenarios
 5. **Memory Leak Tests** - Proper cleanup and disposal
+6. **Integration Tests** - Cross-allocator compatibility and integration
+7. **Regression Tests** - Performance monitoring to prevent degradation
 
 ## 🎯 Best Practices
 

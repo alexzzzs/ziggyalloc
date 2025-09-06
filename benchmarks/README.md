@@ -42,6 +42,21 @@ Performance comparison across different data types:
 - double
 - custom struct (Point)
 
+### MultithreadingBenchmarks.cs
+Performance tests under multithreading scenarios:
+- Parallel allocation patterns with different allocator types
+- Thread safety verification for thread-safe allocators
+- Producer-consumer patterns with memory allocation
+
+### RealWorldScenarioBenchmarks.cs
+Benchmarks simulating real-world usage scenarios:
+- Image processing workflows with large buffers
+- Audio processing with continuous buffers
+- Network packet processing with many small allocations
+- Database record processing with mixed allocation sizes
+- Game engine simulation with various allocation patterns
+- Scientific computing with large matrix operations
+
 ## 🚀 Running Benchmarks
 
 ### Run All Benchmarks
@@ -109,7 +124,7 @@ This shows that while the unmanaged array takes longer per operation (1.49x), it
 
 ## 🏗️ Benchmark Architecture
 
-```mermaid
+```
 graph TD
     A[BenchmarkRunner] --> B[AllocationBenchmarks]
     A --> C[AllocatorBenchmarks]
