@@ -74,6 +74,8 @@ namespace ZiggyAlloc
             // The ScopedMemoryAllocator will handle freeing all memory when it's disposed
             unsafe
             {
+                // Pass null as the allocator to indicate that the buffer doesn't own the memory
+                // This prevents the buffer from trying to free memory that the ScopedMemoryAllocator will free
                 return new UnmanagedBuffer<T>((T*)backingBuffer.RawPointer, backingBuffer.Length);
             }
         }

@@ -28,7 +28,7 @@ namespace ZiggyAlloc.Tests
             buffer1.Dispose();
 
             // Second allocation of same size (should reuse from pool)
-            using var buffer2 = pool.Allocate<int>(100);
+            using var buffer2 = pool.Allocate<int>(100, zeroMemory: true);
             var afterSecondAllocationBytes = pool.TotalAllocatedBytes;
 
             // Assert
@@ -113,11 +113,13 @@ namespace ZiggyAlloc.Tests
             // Allocate and dispose several buffers to fill the pool
             for (int i = 0; i < 5; i++)
             {
-                using var buffer = pool.Allocate<int>(100);
-                // Fill with data to make sure buffers are distinct
-                for (int j = 0; j < buffer.Length; j++)
+                using (var buffer = pool.Allocate<int>(100))
                 {
-                    buffer[j] = i * 1000 + j;
+                    // Fill with data to make sure buffers are distinct
+                    for (int j = 0; j < buffer.Length; j++)
+                    {
+                        buffer[j] = i * 1000 + j;
+                    }
                 }
             }
 

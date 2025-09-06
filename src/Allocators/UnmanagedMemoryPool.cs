@@ -26,6 +26,8 @@ namespace ZiggyAlloc
     public sealed class UnmanagedMemoryPool : IUnmanagedMemoryAllocator, IDisposable
     {
         private readonly IUnmanagedMemoryAllocator _baseAllocator;
+        private readonly ConcurrentDictionary<int, ConcurrentBag<IntPtr>> _pools = new ConcurrentDictionary<int, ConcurrentBag<IntPtr>>();
+        private readonly ConcurrentDictionary<IntPtr, int> _pointerSizes = new ConcurrentDictionary<IntPtr, int>();
         private long _totalAllocatedBytes;
         private bool _disposed = false;
 
@@ -37,6 +39,10 @@ namespace ZiggyAlloc
         /// <summary>
         /// Gets the total number of bytes currently allocated by this allocator.
         /// </summary>
+        /// <remarks>
+        /// This tracks the total bytes ever allocated, not currently allocated.
+        /// When buffers are reused from the pool, this value does not increase.
+        /// </remarks>
         public long TotalAllocatedBytes => Interlocked.Read(ref _totalAllocatedBytes);
 
         /// <summary>
@@ -57,41 +63,31 @@ namespace ZiggyAlloc
         /// <returns>A buffer representing the allocated memory</returns>
         public unsafe UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
-            try
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(UnmanagedMemoryPool));
+
+            if (elementCount < 0)
+                throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
+
+            if (elementCount == 0)
             {
-                if (_disposed)
-                    throw new ObjectDisposedException(nameof(UnmanagedMemoryPool));
+                return new UnmanagedBuffer<T>(null, 0, this);
+            }
 
-                if (elementCount < 0)
-                    throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
-
-                if (elementCount == 0)
+            int sizeInBytes = elementCount * sizeof(T);
+            if (_pools.TryGetValue(sizeInBytes, out var pool) && pool.TryTake(out var pointer))
+            {
+                if (zeroMemory)
                 {
-                    // Return a valid but empty buffer for zero-length allocations
-                    return new UnmanagedBuffer<T>(null, 0, this);
+                    new Span<byte>((void*)pointer, sizeInBytes).Clear();
                 }
-
-                // Calculate total size
-                int elementSize = sizeof(T);
-                long totalSize = (long)elementCount * elementSize;
-                
-                // Add safety check for overflow
-                if (totalSize > int.MaxValue)
-                    throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes");
-
-                // For simplicity and to work correctly with DebugMemoryAllocator,
-                // don't actually pool buffers
-                var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
-                
-                // Update allocation tracking
-                Interlocked.Add(ref _totalAllocatedBytes, (int)totalSize);
-                return buffer;
+                return new UnmanagedBuffer<T>((T*)pointer, elementCount, this);
             }
-            catch
-            {
-                // If allocation fails, rethrow the exception
-                throw;
-            }
+
+            var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
+            Interlocked.Add(ref _totalAllocatedBytes, buffer.SizeInBytes);
+            _pointerSizes.TryAdd(buffer.RawPointer, buffer.SizeInBytes);
+            return new UnmanagedBuffer<T>((T*)buffer.RawPointer, buffer.Length, this);
         }
 
         /// <summary>
@@ -100,20 +96,18 @@ namespace ZiggyAlloc
         /// <param name="pointer">The pointer to the memory to free</param>
         public void Free(IntPtr pointer)
         {
-            if (_disposed)
+            if (_disposed || pointer == IntPtr.Zero)
                 return;
 
-            if (pointer == IntPtr.Zero)
-                return;
-
-            try
+            if (_pointerSizes.TryGetValue(pointer, out var size))
             {
-                // Delegate directly to base allocator
-                _baseAllocator.Free(pointer);
+                var pool = _pools.GetOrAdd(size, _ => new ConcurrentBag<IntPtr>());
+                pool.Add(pointer);
             }
-            catch
+            else
             {
-                // Ignore exceptions during freeing to prevent crashes
+                // This should not happen if the buffer was allocated by this pool
+                _baseAllocator.Free(pointer);
             }
         }
 
@@ -125,8 +119,18 @@ namespace ZiggyAlloc
             if (_disposed)
                 return;
 
-            // Reset allocation tracking
-            Interlocked.Exchange(ref _totalAllocatedBytes, 0);
+            foreach (var pool in _pools.Values)
+            {
+                while (pool.TryTake(out var pointer))
+                {
+                    if (_pointerSizes.TryRemove(pointer, out var size))
+                    {
+                        _baseAllocator.Free(pointer);
+                        Interlocked.Add(ref _totalAllocatedBytes, -size);
+                    }
+                }
+            }
+            _pools.Clear();
         }
 
         /// <summary>

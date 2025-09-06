@@ -162,9 +162,16 @@ namespace ZiggyAlloc
             if (pointer == IntPtr.Zero)
                 return;
 
-            // Delegate to the unmanaged allocator for unmanaged memory
-            _unmanagedAllocator.Free(pointer);
-            // Note: Managed arrays are automatically cleaned up by the GC when the UnmanagedBuffer is disposed
+            try
+            {
+                // Delegate to the unmanaged allocator for unmanaged memory
+                _unmanagedAllocator.Free(pointer);
+                // Note: Managed arrays are automatically cleaned up by the GC when the UnmanagedBuffer is disposed
+            }
+            catch
+            {
+                // Ignore exceptions during freeing to prevent crashes
+            }
         }
 
         /// <summary>

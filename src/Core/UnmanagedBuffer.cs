@@ -303,6 +303,12 @@ namespace ZiggyAlloc
                             slabSlot.Free();
                         }
                     }
+                    else
+                    {
+                        // This shouldn't happen in normal operation, but as a safety measure,
+                        // we won't try to free memory we don't know how to handle
+                        // This prevents potential double-free scenarios
+                    }
                 }
                 catch
                 {

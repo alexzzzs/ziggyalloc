@@ -162,13 +162,14 @@ namespace ZiggyAlloc
         /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
         public void Free(IntPtr pointer)
         {
+            // Check if disposed first, before doing anything else
+            CheckDisposed();
+            
+            if (pointer == IntPtr.Zero) 
+                return;
+
             try
             {
-                CheckDisposed();
-                
-                if (pointer == IntPtr.Zero) 
-                    return;
-
                 bool wasTracked;
                 lock (_lockObject)
                 {
@@ -204,21 +205,15 @@ namespace ZiggyAlloc
                 return;
                 
             Volatile.Write(ref _disposed, true);
-            try
+
+            // Don't call CheckDisposed() here to avoid circular dependency
+            ReportMemoryLeaksInternal();
+            
+            // Explicitly suppress finalization for the backing allocator if it implements IDisposable
+            if (_backingAllocator is IDisposable disposableAllocator)
             {
-                // Don't call CheckDisposed() here to avoid circular dependency
-                ReportMemoryLeaksInternal();
-                
-                // Explicitly suppress finalization for the backing allocator if it implements IDisposable
-                if (_backingAllocator is IDisposable disposableAllocator)
-                {
-                    // We don't dispose the backing allocator as it might be used elsewhere
-                    // But we ensure that any cleanup that needs to happen in this allocator is done
-                }
-            }
-            catch
-            {
-                // Ignore exceptions during disposal to prevent crashes
+                // We don't dispose the backing allocator as it might be used elsewhere
+                // But we ensure that any cleanup that needs to happen in this allocator is done
             }
         }
 
@@ -305,6 +300,7 @@ namespace ZiggyAlloc
         /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
         private void CheckDisposed()
         {
+            // Use Volatile.Read to ensure we're reading the most up-to-date value
             if (Volatile.Read(ref _disposed))
                 throw new ObjectDisposedException(nameof(DebugMemoryAllocator));
         }
