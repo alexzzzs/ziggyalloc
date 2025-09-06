@@ -5,6 +5,18 @@ All notable changes to ZiggyAlloc will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2025-09-06
+
+### Changed
+- **Documentation** - Updated README.md to ensure consistency between GitHub and NuGet package
+- **Package** - Fixed version inconsistency in README package reference example
+
+## [1.2.3] - 2025-09-06
+
+### Changed
+- **Documentation** - Enhanced README.md with comprehensive documentation including performance comparison tables, allocator comparison table, and architecture diagram
+- **Package** - Updated NuGet package README to match GitHub documentation
+
 ## [1.2.2] - 2025-08-30
 
 ### Fixed
