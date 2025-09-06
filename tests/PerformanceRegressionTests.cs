@@ -284,7 +284,8 @@ namespace ZiggyAlloc.Tests
             if (systemStopwatch.ElapsedMilliseconds == 0)
             {
                 // If system allocator is extremely fast, just ensure debug allocator completes
-                Assert.True(debugStopwatch.ElapsedMilliseconds >= 0);
+                // Allow up to 10ms for debug allocator in this case to account for CI variations
+                Assert.True(debugStopwatch.ElapsedMilliseconds <= 10);
             }
             else
             {

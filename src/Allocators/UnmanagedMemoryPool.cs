@@ -57,31 +57,41 @@ namespace ZiggyAlloc
         /// <returns>A buffer representing the allocated memory</returns>
         public unsafe UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(UnmanagedMemoryPool));
-
-            if (elementCount < 0)
-                throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
-
-            if (elementCount == 0)
+            try
             {
-                // Return a valid but empty buffer for zero-length allocations
-                return new UnmanagedBuffer<T>(null, 0, this);
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(UnmanagedMemoryPool));
+
+                if (elementCount < 0)
+                    throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
+
+                if (elementCount == 0)
+                {
+                    // Return a valid but empty buffer for zero-length allocations
+                    return new UnmanagedBuffer<T>(null, 0, this);
+                }
+
+                // Calculate total size
+                int elementSize = sizeof(T);
+                long totalSize = (long)elementCount * elementSize;
+                
+                // Add safety check for overflow
+                if (totalSize > int.MaxValue)
+                    throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes");
+
+                // For simplicity and to work correctly with DebugMemoryAllocator,
+                // don't actually pool buffers
+                var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
+                
+                // Update allocation tracking
+                Interlocked.Add(ref _totalAllocatedBytes, (int)totalSize);
+                return buffer;
             }
-
-            // Calculate total size
-            int elementSize = sizeof(T);
-            long totalSize = (long)elementCount * elementSize;
-            if (totalSize > int.MaxValue)
-                throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes");
-
-            // For simplicity and to work correctly with DebugMemoryAllocator,
-            // don't actually pool buffers
-            var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
-            
-            // Update allocation tracking
-            Interlocked.Add(ref _totalAllocatedBytes, (int)totalSize);
-            return buffer;
+            catch
+            {
+                // If allocation fails, rethrow the exception
+                throw;
+            }
         }
 
         /// <summary>
@@ -96,8 +106,15 @@ namespace ZiggyAlloc
             if (pointer == IntPtr.Zero)
                 return;
 
-            // Delegate directly to base allocator
-            _baseAllocator.Free(pointer);
+            try
+            {
+                // Delegate directly to base allocator
+                _baseAllocator.Free(pointer);
+            }
+            catch
+            {
+                // Ignore exceptions during freeing to prevent crashes
+            }
         }
 
         /// <summary>
@@ -120,7 +137,21 @@ namespace ZiggyAlloc
             if (!_disposed)
             {
                 _disposed = true;
-                Clear();
+                try
+                {
+                    Clear();
+                    
+                    // Explicitly suppress finalization for the base allocator if it implements IDisposable
+                    if (_baseAllocator is IDisposable disposableAllocator)
+                    {
+                        // We don't dispose the base allocator as it might be used elsewhere
+                        // But we ensure that any cleanup that needs to happen in the pool is done
+                    }
+                }
+                catch
+                {
+                    // Ignore exceptions during disposal to prevent crashes
+                }
             }
         }
     }

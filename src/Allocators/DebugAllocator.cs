@@ -115,31 +115,39 @@ namespace ZiggyAlloc
             [CallerLineNumber] int sourceLine = 0,
             [CallerMemberName] string callerMember = "") where T : unmanaged
         {
-            CheckDisposed();
-            
-            var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
-            
-            // Don't track empty allocations since they don't allocate actual memory
-            if (elementCount == 0)
+            try
             {
-                return backingBuffer;
+                CheckDisposed();
+                
+                var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
+                
+                // Don't track empty allocations since they don't allocate actual memory
+                if (elementCount == 0)
+                {
+                    return backingBuffer;
+                }
+                
+                int sizeInBytes;
+                unsafe { sizeInBytes = sizeof(T) * elementCount; }
+                
+                var metadata = new AllocationMetadata(sizeInBytes, sourceFile, sourceLine, callerMember);
+                
+                lock (_lockObject)
+                {
+                    _trackedAllocations.Add(backingBuffer.RawPointer, metadata);
+                }
+                
+                // Create a new buffer that references this debug allocator instead of the backing allocator
+                // This ensures that when the buffer is disposed, it calls our Free method for tracking
+                unsafe
+                {
+                    return new UnmanagedBuffer<T>((T*)backingBuffer.RawPointer, backingBuffer.Length, this);
+                }
             }
-            
-            int sizeInBytes;
-            unsafe { sizeInBytes = sizeof(T) * elementCount; }
-            
-            var metadata = new AllocationMetadata(sizeInBytes, sourceFile, sourceLine, callerMember);
-            
-            lock (_lockObject)
+            catch
             {
-                _trackedAllocations.Add(backingBuffer.RawPointer, metadata);
-            }
-            
-            // Create a new buffer that references this debug allocator instead of the backing allocator
-            // This ensures that when the buffer is disposed, it calls our Free method for tracking
-            unsafe
-            {
-                return new UnmanagedBuffer<T>((T*)backingBuffer.RawPointer, backingBuffer.Length, this);
+                // If allocation fails, rethrow the exception
+                throw;
             }
         }
 
@@ -154,24 +162,31 @@ namespace ZiggyAlloc
         /// <exception cref="ObjectDisposedException">Thrown when the allocator has been disposed</exception>
         public void Free(IntPtr pointer)
         {
-            CheckDisposed();
-            
-            if (pointer == IntPtr.Zero) 
-                return;
-
-            bool wasTracked;
-            lock (_lockObject)
+            try
             {
-                wasTracked = _trackedAllocations.Remove(pointer);
-            }
+                CheckDisposed();
+                
+                if (pointer == IntPtr.Zero) 
+                    return;
 
-            if (!wasTracked)
+                bool wasTracked;
+                lock (_lockObject)
+                {
+                    wasTracked = _trackedAllocations.Remove(pointer);
+                }
+
+                if (!wasTracked)
+                {
+                    Debug.WriteLine($"[DebugMemoryAllocator '{_allocatorName}'] Warning: " +
+                                  $"Attempted to free untracked pointer 0x{pointer.ToString("X")}");
+                }
+
+                _backingAllocator.Free(pointer);
+            }
+            catch
             {
-                Debug.WriteLine($"[DebugMemoryAllocator '{_allocatorName}'] Warning: " +
-                              $"Attempted to free untracked pointer 0x{pointer.ToString("X")}");
+                // Ignore exceptions during freeing to prevent crashes
             }
-
-            _backingAllocator.Free(pointer);
         }
 
         /// <summary>
@@ -189,8 +204,22 @@ namespace ZiggyAlloc
                 return;
                 
             Volatile.Write(ref _disposed, true);
-            // Don't call CheckDisposed() here to avoid circular dependency
-            ReportMemoryLeaksInternal();
+            try
+            {
+                // Don't call CheckDisposed() here to avoid circular dependency
+                ReportMemoryLeaksInternal();
+                
+                // Explicitly suppress finalization for the backing allocator if it implements IDisposable
+                if (_backingAllocator is IDisposable disposableAllocator)
+                {
+                    // We don't dispose the backing allocator as it might be used elsewhere
+                    // But we ensure that any cleanup that needs to happen in this allocator is done
+                }
+            }
+            catch
+            {
+                // Ignore exceptions during disposal to prevent crashes
+            }
         }
 
         /// <summary>

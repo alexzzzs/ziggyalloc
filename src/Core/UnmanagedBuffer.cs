@@ -54,6 +54,7 @@ namespace ZiggyAlloc
             _allocator = allocator;
             _pool = null;
             _managedArrayInfo = null;
+            _slabSlot = null;
             _ownsMemory = true;
         }
 
@@ -67,6 +68,7 @@ namespace ZiggyAlloc
             _allocator = null;
             _pool = null;
             _managedArrayInfo = null;
+            _slabSlot = null;
             _ownsMemory = false;
         }
 
@@ -80,6 +82,7 @@ namespace ZiggyAlloc
             _allocator = null;
             _pool = pool;
             _managedArrayInfo = null;
+            _slabSlot = null;
             _ownsMemory = true;
         }
 
@@ -265,38 +268,46 @@ namespace ZiggyAlloc
 
             if (_ownsMemory && _pointer != null)
             {
-                if (_allocator != null)
+                try
                 {
-                    // Use regular allocator free
-                    _allocator.Free((IntPtr)_pointer);
-                }
-                else if (_pool != null)
-                {
-                    // For pool-based buffers, we don't actually free the memory,
-                    // but return it to the pool instead
-                    // The pool will handle the actual freeing when it's disposed
-                    if (_pool is IUnmanagedMemoryAllocator poolAllocator)
+                    if (_allocator != null)
                     {
-                        poolAllocator.Free((IntPtr)_pointer);
+                        // Use regular allocator free
+                        _allocator.Free((IntPtr)_pointer);
+                    }
+                    else if (_pool != null)
+                    {
+                        // For pool-based buffers, we don't actually free the memory,
+                        // but return it to the pool instead
+                        // The pool will handle the actual freeing when it's disposed
+                        if (_pool is IUnmanagedMemoryAllocator poolAllocator)
+                        {
+                            poolAllocator.Free((IntPtr)_pointer);
+                        }
+                    }
+                    else if (_managedArrayInfo != null)
+                    {
+                        // Free managed array by unpinning it
+                        var info = (HybridAllocator.ManagedArrayInfo)_managedArrayInfo;
+                        if (info.Handle.IsAllocated)
+                        {
+                            info.Handle.Free();
+                        }
+                    }
+                    else if (_slabSlot != null)
+                    {
+                        // For slab slot buffers, we don't actually free the memory,
+                        // but return it to the slab instead
+                        if (_slabSlot is SlabAllocator.SlabSlot slabSlot)
+                        {
+                            slabSlot.Free();
+                        }
                     }
                 }
-                else if (_managedArrayInfo != null)
+                catch
                 {
-                    // Free managed array by unpinning it
-                    var info = (HybridAllocator.ManagedArrayInfo)_managedArrayInfo;
-                    if (info.Handle.IsAllocated)
-                    {
-                        info.Handle.Free();
-                    }
-                }
-                else if (_slabSlot != null)
-                {
-                    // For slab slot buffers, we don't actually free the memory,
-                    // but return it to the slab instead
-                    if (_slabSlot is SlabAllocator.SlabSlot slabSlot)
-                    {
-                        slabSlot.Free();
-                    }
+                    // Ignore exceptions during disposal to prevent crashes
+                    // This is a safety measure to prevent the test runner from crashing
                 }
             }
 

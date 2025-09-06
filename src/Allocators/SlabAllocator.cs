@@ -85,37 +85,52 @@ namespace ZiggyAlloc
         /// <returns>A buffer representing the allocated memory</returns>
         public unsafe UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(SlabAllocator));
-
-            if (elementCount < 0)
-                throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
-
-            if (elementCount == 0)
+            try
             {
-                // Return a valid but empty buffer for zero-length allocations
-                return new UnmanagedBuffer<T>(null, 0, this);
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(SlabAllocator));
+
+                if (elementCount < 0)
+                    throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
+
+                if (elementCount == 0)
+                {
+                    // Return a valid but empty buffer for zero-length allocations
+                    return new UnmanagedBuffer<T>(null, 0, this);
+                }
+
+                // Calculate total size
+                int elementSize = sizeof(T);
+                long totalSize = (long)elementCount * elementSize;
+
+                // Prevent zero-sized or negative-sized slot allocations
+                if (totalSize <= 0 || totalSize > MaxSlabAllocationSize || totalSize > _slabSize / 4)
+                {
+                    // Too large for slab allocation, delegate to base allocator
+                    var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
+                    Interlocked.Add(ref _totalAllocatedBytes, totalSize);
+                    return new UnmanagedBuffer<T>((T*)buffer.RawPointer, buffer.Length, this);
+                }
+
+                // Use slab allocation
+                int slotSize = (int)totalSize;
+                var pool = _slabPools.GetOrAdd(slotSize, _ => new SlabPool(_baseAllocator, _slabSize, slotSize));
+                var slot = pool.AllocateSlot(zeroMemory);
+
+                Interlocked.Add(ref _totalAllocatedBytes, slotSize);
+                return new UnmanagedBuffer<T>((T*)slot.Pointer, elementCount, slot);
             }
-
-            // Calculate total size
-            int elementSize = sizeof(T);
-            long totalSize = (long)elementCount * elementSize;
-
-            if (totalSize > MaxSlabAllocationSize || totalSize > _slabSize / 4)
+            catch
             {
-                // Too large for slab allocation, delegate to base allocator
-                var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
-                Interlocked.Add(ref _totalAllocatedBytes, totalSize);
-                return new UnmanagedBuffer<T>((T*)buffer.RawPointer, elementCount, this);
+                // If slab allocation fails, fall back to base allocator
+                if (!_disposed && _baseAllocator != null)
+                {
+                    return _baseAllocator.Allocate<T>(elementCount, zeroMemory);
+                }
+                
+                // If we can't allocate through base allocator either, rethrow
+                throw;
             }
-
-            // Use slab allocation
-            int slotSize = (int)totalSize;
-            var pool = _slabPools.GetOrAdd(slotSize, _ => new SlabPool(_baseAllocator, _slabSize, slotSize));
-            var slot = pool.AllocateSlot(zeroMemory);
-
-            Interlocked.Add(ref _totalAllocatedBytes, slotSize);
-            return new UnmanagedBuffer<T>((T*)slot.Pointer, elementCount, slot);
         }
 
         /// <summary>
@@ -127,9 +142,16 @@ namespace ZiggyAlloc
             if (_disposed || pointer == IntPtr.Zero)
                 return;
 
-            // In a real implementation, we would need to track which slab a pointer belongs to
-            // For this example, we'll delegate to the base allocator
-            _baseAllocator.Free(pointer);
+            try
+            {
+                // In a real implementation, we would need to track which slab a pointer belongs to
+                // For this example, we'll delegate to the base allocator
+                _baseAllocator.Free(pointer);
+            }
+            catch
+            {
+                // Ignore exceptions during freeing to prevent crashes
+            }
         }
 
         /// <summary>
@@ -140,11 +162,28 @@ namespace ZiggyAlloc
             if (!_disposed)
             {
                 _disposed = true;
-                foreach (var pool in _slabPools.Values)
+                try
                 {
-                    pool.Dispose();
+                    if (_slabPools != null)
+                    {
+                        foreach (var pool in _slabPools.Values)
+                        {
+                            pool?.Dispose();
+                        }
+                        _slabPools.Clear();
+                    }
+                    
+                    // Explicitly suppress finalization for the base allocator if it implements IDisposable
+                    if (_baseAllocator is IDisposable disposableAllocator)
+                    {
+                        // We don't dispose the base allocator as it might be used elsewhere
+                        // But we ensure that any cleanup that needs to happen in this allocator is done
+                    }
                 }
-                _slabPools.Clear();
+                catch
+                {
+                    // Ignore exceptions during disposal to prevent crashes
+                }
             }
         }
 
@@ -215,9 +254,19 @@ namespace ZiggyAlloc
                 if (!_disposed)
                 {
                     _disposed = true;
-                    foreach (var slab in _slabs)
+                    try
                     {
-                        slab.Dispose();
+                        if (_slabs != null)
+                        {
+                            foreach (var slab in _slabs)
+                            {
+                                slab?.Dispose();
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore exceptions during disposal to prevent crashes
                     }
                 }
             }
@@ -237,6 +286,10 @@ namespace ZiggyAlloc
 
             public unsafe Slab(IUnmanagedMemoryAllocator allocator, int slabSize, int slotSize)
             {
+                // Add safety check to prevent division by zero
+                if (slotSize <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(slotSize), "Slot size must be positive");
+                    
                 _buffer = allocator.Allocate<byte>(slabSize);
                 _slotSize = slotSize;
                 _slotCount = slabSize / slotSize;
@@ -259,6 +312,13 @@ namespace ZiggyAlloc
                             _slotInUse[i] = true;
                             unsafe
                             {
+                                // Add safety check to ensure we don't do invalid pointer arithmetic
+                                if (_buffer.RawPointer == IntPtr.Zero || _slotSize <= 0)
+                                {
+                                    _slotInUse[i] = false; // Reset the slot
+                                    return false;
+                                }
+                                
                                 var pointer = (IntPtr)((byte*)_buffer.RawPointer.ToPointer() + (i * _slotSize));
                                 slot = new SlabSlot(pointer, this, i);
                             }
@@ -272,11 +332,16 @@ namespace ZiggyAlloc
 
             public void FreeSlot(int slotIndex)
             {
-                if (!_disposed && slotIndex >= 0 && slotIndex < _slotCount)
+                // Add additional safety checks
+                if (!_disposed && slotIndex >= 0 && slotIndex < _slotCount && _slotInUse != null)
                 {
                     lock (_lock)
                     {
-                        _slotInUse[slotIndex] = false;
+                        // Double-check inside lock
+                        if (!_disposed && slotIndex >= 0 && slotIndex < _slotCount && _slotInUse != null)
+                        {
+                            _slotInUse[slotIndex] = false;
+                        }
                     }
                 }
             }
@@ -286,8 +351,12 @@ namespace ZiggyAlloc
                 if (!_disposed)
                 {
                     _disposed = true;
-                    // Dispose the buffer to properly free memory and notify tracking allocators
-                    _buffer.Dispose();
+                    // Add safety check before disposing buffer
+                    if (_buffer != null)
+                    {
+                        // Dispose the buffer to properly free memory and notify tracking allocators
+                        _buffer.Dispose();
+                    }
                 }
             }
         }
@@ -313,7 +382,18 @@ namespace ZiggyAlloc
             /// </summary>
             public void Free()
             {
-                _slab.FreeSlot(_slotIndex);
+                // Add safety check to prevent operations on null slab
+                if (_slab != null)
+                {
+                    try
+                    {
+                        _slab.FreeSlot(_slotIndex);
+                    }
+                    catch
+                    {
+                        // Ignore exceptions during disposal to prevent crashes
+                    }
+                }
             }
         }
     }

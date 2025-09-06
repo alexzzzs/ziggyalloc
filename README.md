@@ -68,7 +68,7 @@ Different allocators for different use cases:
 
 ## 🏗️ Architecture Overview
 
-```
+``mermaid
 graph TD
     A[IUnmanagedMemoryAllocator] --> B[SystemMemoryAllocator]
     A --> C[ScopedMemoryAllocator]
