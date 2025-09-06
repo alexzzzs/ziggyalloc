@@ -68,7 +68,7 @@ Different allocators for different use cases:
 
 ## 🏗️ Architecture Overview
 
-``mermaid
+```mermaid
 graph TD
     A[IUnmanagedMemoryAllocator] --> B[SystemMemoryAllocator]
     A --> C[ScopedMemoryAllocator]
@@ -84,9 +84,9 @@ graph TD
     F --> B
     G --> B
     
-    I[UnmanagedBuffer<T>] --> J[Bounds Checking]
+    I[UnmanagedBuffer&lt;T&gt;] --> J[Bounds Checking]
     I --> K[Automatic Cleanup]
-    I --> L[Span<T> Integration]
+    I --> L[Span&lt;T&gt; Integration]
 ```
 
 ## 🧠 Core Concepts
