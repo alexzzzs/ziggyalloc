@@ -57,7 +57,8 @@ namespace ZiggyAlloc
             if (elementCount == 0)
             {
                 // Return a valid but empty buffer for zero-length allocations
-                return new UnmanagedBuffer<T>(null, 0, this);
+                // Don't pass the allocator since there's no memory to free
+                return new UnmanagedBuffer<T>(null, 0);
             }
 
             // Calculate total size
@@ -155,11 +156,11 @@ namespace ZiggyAlloc
         /// <param name="pointer">The pointer to the memory to free</param>
         public void Free(IntPtr pointer)
         {
-            if (pointer == IntPtr.Zero)
-                return;
-
             if (_disposed)
                 throw new ObjectDisposedException(nameof(HybridAllocator));
+
+            if (pointer == IntPtr.Zero)
+                return;
 
             // Delegate to the unmanaged allocator for unmanaged memory
             _unmanagedAllocator.Free(pointer);

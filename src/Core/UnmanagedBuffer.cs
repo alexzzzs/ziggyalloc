@@ -156,8 +156,9 @@ namespace ZiggyAlloc
         public Span<T> AsSpan()
         {
             ThrowIfDisposed();
+            // For zero-length buffers, return an empty span instead of throwing
             if (_pointer == null)
-                throw new InvalidOperationException("Buffer is not valid (null pointer)");
+                return Span<T>.Empty;
             
             return new Span<T>(_pointer, _length);
         }
@@ -168,8 +169,13 @@ namespace ZiggyAlloc
         public Span<T> AsSpan(int start, int length)
         {
             ThrowIfDisposed();
+            // For zero-length buffers, return an empty span instead of throwing
             if (_pointer == null)
-                throw new InvalidOperationException("Buffer is not valid (null pointer)");
+            {
+                if (start != 0 || length != 0)
+                    throw new ArgumentOutOfRangeException(nameof(start));
+                return Span<T>.Empty;
+            }
             
             if (start < 0 || start > _length)
                 throw new ArgumentOutOfRangeException(nameof(start));
@@ -186,8 +192,9 @@ namespace ZiggyAlloc
         public ReadOnlySpan<T> AsReadOnlySpan()
         {
             ThrowIfDisposed();
+            // For zero-length buffers, return an empty span instead of throwing
             if (_pointer == null)
-                throw new InvalidOperationException("Buffer is not valid (null pointer)");
+                return ReadOnlySpan<T>.Empty;
             
             return new ReadOnlySpan<T>(_pointer, _length);
         }
@@ -198,6 +205,7 @@ namespace ZiggyAlloc
         public void Fill(T value)
         {
             ThrowIfDisposed();
+            // For zero-length buffers, AsSpan() will return an empty span, so Fill() will do nothing
             AsSpan().Fill(value);
         }
 
@@ -207,11 +215,8 @@ namespace ZiggyAlloc
         public void Clear()
         {
             ThrowIfDisposed();
-            if (_pointer == null)
-                throw new InvalidOperationException("Buffer is not valid (null pointer)");
-            
-            var byteSpan = new Span<byte>(_pointer, SizeInBytes);
-            byteSpan.Clear();
+            // For zero-length buffers, AsSpan() will return an empty span, so Clear() will do nothing
+            AsSpan().Clear();
         }
 
         /// <summary>

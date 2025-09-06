@@ -247,7 +247,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_EmptyBuffer_BoundsCheckingWorks()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(0);
 
             // Act & Assert
@@ -263,7 +263,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_IndexAccess_BoundsCheckingWorks()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(10);
 
             // Act & Assert
@@ -283,7 +283,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_FirstLastAccess_EmptyBuffer_Throws()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(0);
 
             // Act & Assert
@@ -295,7 +295,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_FirstLastAccess_NonEmptyBuffer_Works()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(5);
             buffer[0] = 10;
             buffer[4] = 50;
@@ -309,7 +309,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_AsSpan_ZeroLength_Works()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(0);
 
             // Act
@@ -323,7 +323,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_AsSpanWithRange_ZeroLength_Works()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(0);
 
             // Act
@@ -337,7 +337,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_AsSpanWithRange_InvalidRange_Throws()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(10);
 
             // Act & Assert
@@ -350,22 +350,22 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedBuffer_Fill_ZeroLength_Works()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(0);
 
-            // Act & Assert - Should throw InvalidOperationException for null pointer
-            Assert.Throws<InvalidOperationException>(() => buffer.Fill(42));
+            // Act & Assert - Should not throw exceptions for zero-length buffers
+            buffer.Fill(42);
         }
 
         [Fact]
         public void UnmanagedBuffer_Clear_ZeroLength_Works()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             using var buffer = allocator.Allocate<int>(0);
 
-            // Act & Assert - Should throw InvalidOperationException for null pointer
-            Assert.Throws<InvalidOperationException>(() => buffer.Clear());
+            // Act & Assert - Should not throw exceptions for zero-length buffers
+            buffer.Clear();
         }
     }
 }

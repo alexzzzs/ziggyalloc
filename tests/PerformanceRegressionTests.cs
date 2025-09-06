@@ -20,7 +20,7 @@ namespace ZiggyAlloc.Tests
         public void SystemMemoryAllocator_AllocationPerformance_DoesNotDegrade()
         {
             // Arrange
-            var allocator = new SystemMemoryAllocator();
+            using var allocator = new SystemMemoryAllocator();
             const int iterations = 1000;
             const int bufferSize = 1024;
 
@@ -46,7 +46,7 @@ namespace ZiggyAlloc.Tests
         public void UnmanagedMemoryPool_PerformanceImprovement_MeetsThreshold()
         {
             // Arrange
-            var systemAllocator = new SystemMemoryAllocator();
+            using var systemAllocator = new SystemMemoryAllocator();
             using var pool = new UnmanagedMemoryPool(systemAllocator);
             const int iterations = 1000;
             const int bufferSize = 1024;
@@ -118,7 +118,7 @@ namespace ZiggyAlloc.Tests
         public void SlabAllocator_SmallAllocationPerformance_MeetsThreshold()
         {
             // Arrange
-            var systemAllocator = new SystemMemoryAllocator();
+            using var systemAllocator = new SystemMemoryAllocator();
             using var slabAllocator = new SlabAllocator(systemAllocator);
             const int iterations = 1000;
             const int bufferSize = 128; // Small buffer that should use slab allocation
