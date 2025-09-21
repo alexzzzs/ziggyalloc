@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Singleton Pattern** - Refactored Z.cs to use thread-safe lazy initialization instead of basic static initialization
 - **Resource Management** - Enhanced disposal patterns and resource cleanup across all allocator classes
 - **Documentation** - Clarified behavior of resource ownership and tracking semantics
+- **HybridAllocator Logic** - Fixed ShouldClearManagedArray method to properly respect the zeroMemory parameter
+- **Code Quality** - Removed redundant null checks and improved code clarity across multiple classes
 
 ### Fixed
 - **Memory Safety Issues** - Fixed potential memory leaks and null pointer access issues in multiple components
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DeferScope.cs** - Added null validation for allocator and defer parameters in extension methods
 - **UnmanagedBuffer.cs** - Improved error handling in Dispose method with debug logging
 - **Thread Safety** - Fixed race conditions in singleton access patterns and improved synchronization
+- **Compiler Warnings** - Resolved all null reference warnings in SlabAllocator with proper null assertions
+- **HybridAllocator** - Fixed logic error where zeroMemory parameter was ignored in managed array allocation
 
 ## [1.2.5] - 2025-09-06
 
