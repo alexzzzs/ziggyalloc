@@ -14,11 +14,15 @@ namespace ZiggyAlloc
         private long _totalAllocatedBytes;
         private bool _disposed = false;
 
-        // Thresholds based on benchmark results
+        // Thresholds based on benchmark results - these can be made configurable in the future
         private const int BYTE_THRESHOLD = 1024;
         private const int INT_THRESHOLD = 512;
         private const int DOUBLE_THRESHOLD = 128;
         private const int STRUCT_THRESHOLD = 64;
+
+        // Constants for allocation strategy calculations
+        private const int MIN_THRESHOLD = 32; // Minimum threshold for unknown types
+        private const int MAX_THRESHOLD = 1024; // Maximum threshold for unknown types
 
         /// <summary>
         /// Gets a value indicating that this allocator supports individual memory deallocation.
@@ -96,7 +100,7 @@ namespace ZiggyAlloc
                 try
                 {
                     // Zero-initialize if requested (arrays are zero-initialized by default in .NET)
-                    if (zeroMemory && ShouldClearManagedArray<T>())
+                    if (ShouldClearManagedArray<T>(zeroMemory))
                     {
                         Array.Clear(managedArray, 0, managedArray.Length);
                     }
@@ -156,7 +160,7 @@ namespace ZiggyAlloc
             {
                 // For unknown types, use a reasonable threshold based on element size
                 // Prevent very small thresholds for large element sizes
-                int threshold = Math.Max(32, Math.Min(1024, 1024 / elementSize));
+                int threshold = Math.Max(MIN_THRESHOLD, Math.Min(MAX_THRESHOLD, MAX_THRESHOLD / elementSize));
                 return elementCount > threshold;
             }
         }
@@ -169,11 +173,11 @@ namespace ZiggyAlloc
         /// needed when the zeroMemory flag is true and we're not using the default behavior.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool ShouldClearManagedArray<T>() where T : unmanaged
+        private static bool ShouldClearManagedArray<T>(bool zeroMemory) where T : unmanaged
         {
             // Arrays in .NET are zero-initialized by default, but we may still need to clear
             // if the zeroMemory flag was explicitly set to true
-            return true; // We always need to respect the zeroMemory parameter
+            return zeroMemory; // Only clear if explicitly requested
         }
 
         /// <summary>

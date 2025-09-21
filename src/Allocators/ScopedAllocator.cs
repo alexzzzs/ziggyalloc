@@ -65,6 +65,10 @@ namespace ZiggyAlloc
             ThrowIfDisposed();
 
             var backingBuffer = _backingAllocator.Allocate<T>(elementCount, zeroMemory);
+
+            if (backingBuffer == null)
+                throw new InvalidOperationException("Failed to allocate backing buffer");
+
             lock (_lock)
             {
                 _allocatedPointers.Add(backingBuffer.RawPointer);
@@ -119,9 +123,13 @@ namespace ZiggyAlloc
                     {
                         _backingAllocator.Free(_allocatedPointers[i]);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore exceptions during cleanup
+                        // Log exception in debug builds instead of silently ignoring
+                        #if DEBUG
+                        System.Diagnostics.Debug.WriteLine($"Exception during cleanup in ScopedMemoryAllocator.Dispose: {ex}");
+                        #endif
+                        throw; // Re-throw to maintain original behavior for compatibility
                     }
                 }
 

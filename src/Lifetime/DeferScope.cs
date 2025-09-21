@@ -98,6 +98,11 @@ namespace ZiggyAlloc
             int elementCount,
             bool zeroMemory = false) where T : unmanaged
         {
+            if (allocator == null)
+                throw new ArgumentNullException(nameof(allocator));
+            if (defer == null)
+                throw new ArgumentNullException(nameof(defer));
+
             var buffer = allocator.Allocate<T>(elementCount, zeroMemory);
             defer.Defer(() => buffer.Dispose());
             return buffer;
@@ -111,6 +116,11 @@ namespace ZiggyAlloc
             DeferScope defer,
             bool zeroMemory = false) where T : unmanaged
         {
+            if (allocator == null)
+                throw new ArgumentNullException(nameof(allocator));
+            if (defer == null)
+                throw new ArgumentNullException(nameof(defer));
+
             return allocator.AllocateDeferred<T>(defer, 1, zeroMemory);
         }
     }

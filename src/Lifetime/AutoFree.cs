@@ -59,6 +59,12 @@ namespace ZiggyAlloc
         /// or when used in a 'using' statement. After disposal, the Buffer and Value properties
         /// should not be accessed as they will refer to freed memory.
         /// </remarks>
-        public void Dispose() => _allocator.Free(Buffer.RawPointer);
+        public void Dispose()
+        {
+            if (Buffer.IsValid && Buffer.RawPointer != IntPtr.Zero)
+            {
+                _allocator.Free(Buffer.RawPointer);
+            }
+        }
     }
 }

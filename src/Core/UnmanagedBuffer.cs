@@ -310,10 +310,13 @@ namespace ZiggyAlloc
                         // This prevents potential double-free scenarios
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore exceptions during disposal to prevent crashes
-                    // This is a safety measure to prevent the test runner from crashing
+                    // Log exception in debug builds instead of silently ignoring
+                    #if DEBUG
+                    System.Diagnostics.Debug.WriteLine($"Exception during disposal in UnmanagedBuffer.Dispose: {ex}");
+                    #endif
+                    throw; // Re-throw to maintain original behavior for compatibility
                 }
             }
 

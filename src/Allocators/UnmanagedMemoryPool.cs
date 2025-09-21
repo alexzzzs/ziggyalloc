@@ -94,20 +94,39 @@ namespace ZiggyAlloc
         /// Frees previously allocated unmanaged memory.
         /// </summary>
         /// <param name="pointer">The pointer to the memory to free</param>
+        /// <remarks>
+        /// If the pointer was allocated by this pool, it will be returned to the appropriate pool for reuse.
+        /// If the pointer was not allocated by this pool, it will be freed using the base allocator.
+        /// </remarks>
         public void Free(IntPtr pointer)
         {
             if (_disposed || pointer == IntPtr.Zero)
                 return;
 
-            if (_pointerSizes.TryGetValue(pointer, out var size))
+            try
             {
-                var pool = _pools.GetOrAdd(size, _ => new ConcurrentBag<IntPtr>());
-                pool.Add(pointer);
+                if (_pointerSizes.TryGetValue(pointer, out var size))
+                {
+                    var pool = _pools.GetOrAdd(size, _ => new ConcurrentBag<IntPtr>());
+                    pool.Add(pointer);
+                }
+                else
+                {
+                    // This should not happen if the buffer was allocated by this pool
+                    // Log this condition in debug builds
+                    #if DEBUG
+                    System.Diagnostics.Debug.WriteLine($"Warning: Attempted to free pointer 0x{pointer.ToString("X")} that was not allocated by this pool");
+                    #endif
+                    _baseAllocator.Free(pointer);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // This should not happen if the buffer was allocated by this pool
-                _baseAllocator.Free(pointer);
+                // Log exception in debug builds instead of silently ignoring
+                #if DEBUG
+                System.Diagnostics.Debug.WriteLine($"Exception during memory cleanup in UnmanagedMemoryPool.Free: {ex}");
+                #endif
+                throw; // Re-throw to maintain original behavior for compatibility
             }
         }
 
@@ -152,9 +171,13 @@ namespace ZiggyAlloc
                         // But we ensure that any cleanup that needs to happen in the pool is done
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore exceptions during disposal to prevent crashes
+                    // Log exception in debug builds instead of silently ignoring
+                    #if DEBUG
+                    System.Diagnostics.Debug.WriteLine($"Exception during disposal in UnmanagedMemoryPool.Dispose: {ex}");
+                    #endif
+                    throw; // Re-throw to maintain original behavior for compatibility
                 }
             }
         }

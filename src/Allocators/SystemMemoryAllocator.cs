@@ -10,7 +10,9 @@ namespace ZiggyAlloc
     /// </summary>
     public sealed class SystemMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
-        private const int STACK_ALLOC_THRESHOLD = 1024; // 1KB
+        private const string DEBUG_EXCEPTION_DISPOSAL = "Exception during disposal in SystemMemoryAllocator.Dispose";
+        private const string DEBUG_EXCEPTION_MEMORY_CLEANUP = "Exception during memory cleanup in SystemMemoryAllocator.Free";
+
         private long _totalAllocatedBytes = 0;
 
         /// <summary>
@@ -19,8 +21,12 @@ namespace ZiggyAlloc
         public bool SupportsIndividualDeallocation => true;
 
         /// <summary>
-        /// Gets the total number of bytes currently allocated by this allocator.
+        /// Gets the total number of bytes allocated by this allocator.
         /// </summary>
+        /// <remarks>
+        /// This value tracks cumulative allocations but does not decrement when memory is freed.
+        /// This represents the total bytes ever allocated, not currently allocated bytes.
+        /// </remarks>
         public long TotalAllocatedBytes => Interlocked.Read(ref _totalAllocatedBytes);
 
         /// <summary>
@@ -41,15 +47,18 @@ namespace ZiggyAlloc
                 return new UnmanagedBuffer<T>(null, 0, this);
             }
 
+            // Calculate element size once for performance
+            int elementSize = sizeof(T);
+
             // Calculate total size with overflow checking
             long totalSize;
             try
             {
-                totalSize = (long)elementCount * sizeof(T);
+                totalSize = (long)elementCount * elementSize;
             }
             catch (OverflowException)
             {
-                throw new OverflowException($"Allocation size overflow: {elementCount} elements of {sizeof(T)} bytes each");
+                throw new OverflowException($"Allocation size overflow: {elementCount} elements of {elementSize} bytes each");
             }
 
             if (totalSize > int.MaxValue)
@@ -77,12 +86,27 @@ namespace ZiggyAlloc
         /// Frees previously allocated unmanaged memory.
         /// </summary>
         /// <param name="pointer">The pointer to the memory to free</param>
+        /// <remarks>
+        /// Note: TotalAllocatedBytes only tracks allocations and does not decrement on deallocation
+        /// as managed memory cleanup timing is non-deterministic.
+        /// </remarks>
         public unsafe void Free(IntPtr pointer)
         {
             if (pointer == IntPtr.Zero)
                 return;
 
-            NativeMemory.Free((void*)pointer);
+            try
+            {
+                NativeMemory.Free((void*)pointer);
+            }
+            catch (Exception ex)
+            {
+                // Log exception in debug builds instead of silently ignoring
+                #if DEBUG
+                System.Diagnostics.Debug.WriteLine($"{DEBUG_EXCEPTION_MEMORY_CLEANUP}: {ex}");
+                #endif
+                throw; // Re-throw to maintain original behavior for compatibility
+            }
         }
 
         /// <summary>
@@ -97,6 +121,9 @@ namespace ZiggyAlloc
             if (elementCount < 0)
                 throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count cannot be negative");
 
+            if (pointer == IntPtr.Zero)
+                throw new ArgumentNullException(nameof(pointer), "Pointer cannot be null");
+
             return new UnmanagedBuffer<T>((T*)pointer, elementCount);
         }
 
@@ -108,6 +135,9 @@ namespace ZiggyAlloc
         /// <returns>A buffer that wraps the span's memory</returns>
         public static unsafe UnmanagedBuffer<T> WrapSpan<T>(Span<T> span) where T : unmanaged
         {
+            if (span.Length < 0)
+                throw new ArgumentOutOfRangeException(nameof(span), "Span length cannot be negative");
+
             fixed (T* pointer = span)
             {
                 return new UnmanagedBuffer<T>(pointer, span.Length);
