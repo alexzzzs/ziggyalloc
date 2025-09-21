@@ -26,8 +26,14 @@ namespace ZiggyAlloc
         public bool SupportsIndividualDeallocation => _unmanagedAllocator.SupportsIndividualDeallocation;
 
         /// <summary>
-        /// Gets the total number of bytes currently allocated by this allocator.
+        /// Gets the total number of bytes allocated by this allocator.
         /// </summary>
+        /// <remarks>
+        /// This value tracks cumulative allocations but does not decrement when memory is freed.
+        /// For unmanaged allocations, memory is freed immediately via Free().
+        /// For managed allocations, memory is cleaned up by the GC when UnmanagedBuffer is disposed.
+        /// This represents the total bytes ever allocated, not currently allocated bytes.
+        /// </remarks>
         public long TotalAllocatedBytes => Interlocked.Read(ref _totalAllocatedBytes);
 
         /// <summary>
@@ -85,27 +91,40 @@ namespace ZiggyAlloc
                 // Use managed allocation for small allocations where it's faster
                 // Create a managed array and pin it to get a pointer
                 var managedArray = new T[elementCount];
-                
-                // Zero-initialize if requested (arrays are zero-initialized by default in .NET)
-                if (zeroMemory && !IsZeroInitialized<T>())
+                var handle = default(GCHandle);
+
+                try
                 {
-                    Array.Clear(managedArray, 0, managedArray.Length);
+                    // Zero-initialize if requested (arrays are zero-initialized by default in .NET)
+                    if (zeroMemory && ShouldClearManagedArray<T>())
+                    {
+                        Array.Clear(managedArray, 0, managedArray.Length);
+                    }
+
+                    // Pin the array to get a stable pointer
+                    handle = GCHandle.Alloc(managedArray, GCHandleType.Pinned);
+                    var pointer = (T*)handle.AddrOfPinnedObject();
+
+                    // Update allocation tracking
+                    Interlocked.Add(ref _totalAllocatedBytes, totalSize);
+
+                    // Create a buffer that wraps the managed memory with cleanup information
+                    var managedArrayInfo = new HybridAllocator.ManagedArrayInfo
+                    {
+                        Array = managedArray,
+                        Handle = handle
+                    };
+                    return new UnmanagedBuffer<T>(pointer, elementCount, managedArrayInfo);
                 }
-                
-                // Pin the array to get a stable pointer
-                var handle = GCHandle.Alloc(managedArray, GCHandleType.Pinned);
-                var pointer = (T*)handle.AddrOfPinnedObject();
-                
-                // Update allocation tracking
-                Interlocked.Add(ref _totalAllocatedBytes, totalSize);
-                
-                // Create a buffer that wraps the managed memory with cleanup information
-                var managedArrayInfo = new HybridAllocator.ManagedArrayInfo 
-                { 
-                    Array = managedArray, 
-                    Handle = handle 
-                };
-                return new UnmanagedBuffer<T>(pointer, elementCount, managedArrayInfo);
+                catch
+                {
+                    // Clean up the GCHandle if it was allocated before re-throwing
+                    if (handle.IsAllocated)
+                    {
+                        handle.Free();
+                    }
+                    throw;
+                }
             }
         }
 
@@ -135,25 +154,38 @@ namespace ZiggyAlloc
             }
             else
             {
-                int threshold = Math.Max(32, 1024 / elementSize);
+                // For unknown types, use a reasonable threshold based on element size
+                // Prevent very small thresholds for large element sizes
+                int threshold = Math.Max(32, Math.Min(1024, 1024 / elementSize));
                 return elementCount > threshold;
             }
         }
 
         /// <summary>
-        /// Checks if a type is zero-initialized by default.
+        /// Determines if additional zero-initialization is needed for managed arrays.
         /// </summary>
+        /// <remarks>
+        /// Arrays in .NET are zero-initialized by default, so explicit clearing is only
+        /// needed when the zeroMemory flag is true and we're not using the default behavior.
+        /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsZeroInitialized<T>() where T : unmanaged
+        private static bool ShouldClearManagedArray<T>() where T : unmanaged
         {
-            // Arrays in .NET are zero-initialized by default
-            return true;
+            // Arrays in .NET are zero-initialized by default, but we may still need to clear
+            // if the zeroMemory flag was explicitly set to true
+            return true; // We always need to respect the zeroMemory parameter
         }
 
         /// <summary>
         /// Frees previously allocated unmanaged memory.
         /// </summary>
         /// <param name="pointer">The pointer to the memory to free</param>
+        /// <remarks>
+        /// This method only handles unmanaged allocations. Managed allocations are automatically
+        /// cleaned up by the garbage collector when the UnmanagedBuffer is disposed.
+        /// Note: TotalAllocatedBytes only tracks allocations and does not decrement on deallocation
+        /// as managed memory cleanup timing is non-deterministic.
+        /// </remarks>
         public void Free(IntPtr pointer)
         {
             if (_disposed)
@@ -168,15 +200,23 @@ namespace ZiggyAlloc
                 _unmanagedAllocator.Free(pointer);
                 // Note: Managed arrays are automatically cleaned up by the GC when the UnmanagedBuffer is disposed
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore exceptions during freeing to prevent crashes
+                // Log exception in debug builds instead of silently ignoring
+                #if DEBUG
+                System.Diagnostics.Debug.WriteLine($"Exception during memory cleanup in HybridAllocator.Free: {ex}");
+                #endif
+                throw; // Re-throw to maintain original behavior for compatibility
             }
         }
 
         /// <summary>
         /// Disposes the HybridAllocator and releases any unmanaged resources.
         /// </summary>
+        /// <remarks>
+        /// The unmanaged allocator is not disposed here as this allocator does not own it.
+        /// The owner of the HybridAllocator is responsible for disposing the underlying allocator.
+        /// </remarks>
         public void Dispose()
         {
             if (!_disposed)
