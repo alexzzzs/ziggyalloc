@@ -5,6 +5,32 @@ All notable changes to ZiggyAlloc will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2025-09-21
+
+### Added
+- **Enhanced Error Handling** - Comprehensive debug logging throughout all allocator classes for better troubleshooting
+- **Thread Safety Improvements** - Enhanced synchronization patterns and race condition handling across multiple components
+- **Input Validation** - Added comprehensive null checks and parameter validation across all major classes
+- **Factory Methods** - Added factory method in Z.cs for creating new allocator instances
+
+### Changed
+- **Error Handling Strategy** - Replaced silent exception swallowing with proper debug logging and exception propagation
+- **Singleton Pattern** - Refactored Z.cs to use thread-safe lazy initialization instead of basic static initialization
+- **Resource Management** - Enhanced disposal patterns and resource cleanup across all allocator classes
+- **Documentation** - Clarified behavior of resource ownership and tracking semantics
+
+### Fixed
+- **Memory Safety Issues** - Fixed potential memory leaks and null pointer access issues in multiple components
+- **SystemMemoryAllocator** - Enhanced error handling, added null validation for WrapExisting() and span validation for WrapSpan()
+- **SlabAllocator** - Fixed potential null reference issues in slot allocation and improved exception handling
+- **ScopedMemoryAllocator** - Added null validation for backing buffer allocation and improved disposal error handling
+- **UnmanagedMemoryPool** - Enhanced error handling in disposal and Free methods with better documentation
+- **DebugMemoryAllocator** - Added null validation for backing buffer allocation and improved error handling
+- **AutoFree.cs** - Added null pointer validation in Dispose method to prevent crashes
+- **DeferScope.cs** - Added null validation for allocator and defer parameters in extension methods
+- **UnmanagedBuffer.cs** - Improved error handling in Dispose method with debug logging
+- **Thread Safety** - Fixed race conditions in singleton access patterns and improved synchronization
+
 ## [1.2.5] - 2025-09-06
 
 ### Added
