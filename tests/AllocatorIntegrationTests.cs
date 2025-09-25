@@ -73,6 +73,9 @@ namespace ZiggyAlloc.Tests
             // Assert
             Assert.True(buffer1.IsValid);
             Assert.True(buffer2.IsValid);
+
+            // Ensure no memory leaks
+            Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
         }
 
         [Fact]
@@ -107,6 +110,9 @@ namespace ZiggyAlloc.Tests
             // Assert
             Assert.True(buffer.IsValid);
             Assert.Equal(100, buffer.Length);
+
+            // Ensure no memory leaks
+            Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
         }
 
         [Fact]
@@ -184,6 +190,9 @@ namespace ZiggyAlloc.Tests
             // Assert
             Assert.True(buffer.IsValid);
             Assert.Equal(50, buffer.Length);
+
+            // Ensure no memory leaks
+            Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
         }
 
         [Fact]

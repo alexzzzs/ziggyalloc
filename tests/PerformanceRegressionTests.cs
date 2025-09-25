@@ -316,9 +316,10 @@ namespace ZiggyAlloc.Tests
 
             // Assert
             _output.WriteLine($"Allocator chain (System->Debug->Pool->Hybrid) 100 allocations took {stopwatch.ElapsedMilliseconds}ms");
-            
-            // Should complete successfully
+
+            // Should complete successfully and have no memory leaks
             Assert.True(stopwatch.ElapsedMilliseconds >= 0);
+            Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
         }
 
         [Fact]
