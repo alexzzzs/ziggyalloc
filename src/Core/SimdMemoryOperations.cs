@@ -3,6 +3,9 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.InteropServices;
 using System.Numerics;
+#if NETCOREAPP3_0_OR_GREATER
+using System.Runtime.Intrinsics.X86;
+#endif
 
 namespace ZiggyAlloc
 {
@@ -20,7 +23,17 @@ namespace ZiggyAlloc
         /// <summary>
         /// Gets a value indicating whether AVX2 operations are supported.
         /// </summary>
-        public static bool IsAvx2Supported => RuntimeInformation.ProcessArchitecture == Architecture.X86 && Avx2.IsSupported;
+        public static bool IsAvx2Supported
+        {
+            get
+            {
+#if NETCOREAPP3_0_OR_GREATER
+                return RuntimeInformation.ProcessArchitecture == Architecture.X86 && Avx2.IsSupported;
+#else
+                return false;
+#endif
+            }
+        }
 
         /// <summary>
         /// Zero-initializes memory using the most efficient method available.
@@ -62,6 +75,7 @@ namespace ZiggyAlloc
                 return;
             }
 
+#if NETCOREAPP3_0_OR_GREATER
             byte* bytePtr = (byte*)ptr;
             int avxLength = byteLength / 32 * 32; // Process in 32-byte chunks
 
@@ -76,6 +90,7 @@ namespace ZiggyAlloc
             {
                 bytePtr[i] = 0;
             }
+#endif
         }
 
         /// <summary>
@@ -211,6 +226,7 @@ namespace ZiggyAlloc
                 return;
             }
 
+#if NETCOREAPP3_0_OR_GREATER
             byte* destPtr = (byte*)destination;
             byte* srcPtr = (byte*)source;
             int avxLength = byteLength / 32 * 32;
@@ -226,6 +242,7 @@ namespace ZiggyAlloc
             {
                 destPtr[i] = srcPtr[i];
             }
+#endif
         }
 
         /// <summary>
