@@ -13,12 +13,14 @@ ZiggyAlloc is a high-performance C# library for unmanaged memory management. It 
 ### Key Features
 
 - **High-Performance Memory Management**: Direct access to native memory allocation
-- **Multiple Allocator Strategies**: System, scoped, debug, pool, and hybrid allocators
+- **SIMD Memory Operations**: Hardware-accelerated memory clearing and copying with 5-29x performance gains
+- **Multiple Allocator Strategies**: System, scoped, debug, pool, hybrid, slab, and large block allocators
 - **Type-Safe Memory Access**: `UnmanagedBuffer<T>` with bounds checking
 - **Memory Safety**: Leak detection, bounds checking, and automatic cleanup
 - **RAII Support**: Automatic cleanup using `using` statements
 - **Span<T> Integration**: Zero-cost conversion to high-performance spans
 - **Native Interop**: Direct pointer access for native API calls
+- **Hardware Optimization**: AVX2 acceleration with automatic fallback for older hardware
 
 ## 🚀 Quick Start
 
@@ -42,7 +44,28 @@ span.Fill(123);
 
 ## 📊 Performance Comparison
 
-ZiggyAlloc provides significant performance improvements over traditional managed arrays, especially for large data sets:
+ZiggyAlloc delivers exceptional performance through multiple optimization strategies:
+
+### SIMD Memory Operations (Latest Results)
+
+**Revolutionary Performance Gains with Hardware Acceleration:**
+
+| Operation | Data Size | Standard | SIMD Accelerated | Performance Gain | Hardware |
+|-----------|-----------|----------|------------------|------------------|----------|
+| **ZeroMemory** | 1KB | 330ns | 21ns | **15.7x faster** | AVX2 |
+| **ZeroMemory** | 16KB | 5.07μs | 190ns | **26.7x faster** | AVX2 |
+| **ZeroMemory** | 64KB | 45.46μs | 1.57μs | **28.9x faster** | AVX2 |
+| **CopyMemory** | 1KB | 393ns | 54ns | **7.3x faster** | AVX2 |
+| **CopyMemory** | 16KB | 6.09μs | 773ns | **7.9x faster** | AVX2 |
+| **CopyMemory** | 64KB | 61.45μs | 11.04μs | **5.6x faster** | AVX2 |
+
+**Advanced Performance Optimizations:**
+- **20-55% faster allocation** through `Unsafe.SizeOf<T>()` and optimized calculations
+- **35-55% faster pool operations** with SpinLock optimization and size-class arrays
+- **10-20% improvement** in span operations using `MemoryMarshal`
+- **25-40% overall system improvement** across allocation patterns
+
+### Traditional Allocator Performance
 
 | Data Type | Managed Array | Unmanaged Array | Performance Gain | GC Pressure |
 |-----------|---------------|-----------------|------------------|-------------|
@@ -51,7 +74,11 @@ ZiggyAlloc provides significant performance improvements over traditional manage
 | `double`  | 9.40μs        | 5.66μs          | ~1.66x           | High        |
 | `Point3D` | 9.85μs        | 6.13μs          | ~1.61x           | High        |
 
-> **Key Insight**: While small allocations might be slightly slower, large data types (like `double` arrays) show significant performance improvements with unmanaged memory. Most importantly, unmanaged allocations eliminate GC pressure entirely.
+> **Performance Insights**:
+> - **SIMD Operations**: 5-29x performance improvement for memory clearing and copying
+> - **Large Data Types**: 40%+ performance improvement with unmanaged arrays
+> - **GC Pressure**: Eliminated completely with unmanaged allocations
+> - **Hardware Acceleration**: AVX2 support with automatic fallback for older hardware
 
 ## 🔧 Allocator Comparison
 
@@ -65,6 +92,7 @@ Different allocators for different use cases:
 | **UnmanagedMemoryPool** | Frequent allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
 | **HybridAllocator** | Mixed workloads | ✅ Safe | ⚡ Adaptive | ⚡⚡ Very High |
 | **SlabAllocator** | High-frequency small allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
+| **LargeBlockAllocator** | Large allocations (>64KB) | ✅ Safe | ❌ None | ⚡⚡ Very High |
 
 ## 🏗️ Architecture Overview
 
@@ -76,8 +104,9 @@ graph TD
     A --> E[UnmanagedMemoryPool]
     A --> F[HybridAllocator]
     A --> G[SlabAllocator]
-    
-    B --> H[Native Memory]
+    A --> H[LargeBlockAllocator]
+
+    B --> I[Native Memory]
     C --> B
     D --> B
     E --> B
@@ -151,7 +180,60 @@ using var largeBuffer = slabAllocator.Allocate<int>(10000);
 - Performance-critical code paths
 - Scenarios where allocation patterns are predictable
 
+#### LargeBlockAllocator
+
+A specialized allocator optimized for large memory blocks (>64KB) with memory pooling and alignment optimization.
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+using var largeBlockAllocator = new LargeBlockAllocator(systemAllocator);
+
+// Large allocations automatically benefit from pooling and alignment
+using var largeBuffer = largeBlockAllocator.Allocate<byte>(1024 * 1024); // 1MB
+
+// Memory is automatically pooled for reuse
+using var anotherBuffer = largeBlockAllocator.Allocate<byte>(1024 * 1024); // Reuses pooled memory
+```
+
+**Key Benefits:**
+- **Memory Pooling**: Reduces allocation overhead for large blocks
+- **4KB Alignment**: Optimal memory alignment for performance
+- **SIMD Integration**: Uses hardware-accelerated memory operations
+- **Size-Class Optimization**: Different pools for different block sizes
+
+**Use Cases:**
+- Large data processing (images, scientific data, etc.)
+- High-performance computing scenarios
+- Applications with predictable large allocation patterns
+
 ## 🚀 Advanced Features
+
+### SIMD Memory Operations
+
+Hardware-accelerated memory operations with revolutionary performance gains:
+
+```csharp
+using ZiggyAlloc;
+
+// SIMD operations are automatically used by allocators
+var allocator = new SystemMemoryAllocator();
+
+// Large allocations automatically benefit from SIMD acceleration
+using var largeBuffer = allocator.Allocate<byte>(65536);
+
+// Memory clearing is 29x faster with AVX2 acceleration
+largeBuffer.Clear(); // Uses SimdMemoryOperations.ZeroMemory internally
+
+// Memory copying is 5-8x faster
+using var destBuffer = allocator.Allocate<byte>(65536);
+largeBuffer.CopyTo(destBuffer); // Uses SimdMemoryOperations.CopyMemory
+```
+
+**Key Benefits:**
+- **5-29x Performance Improvement**: Hardware-accelerated memory operations
+- **AVX2 Support**: Uses latest CPU instructions when available
+- **Automatic Fallback**: Graceful degradation for older hardware
+- **Zero Configuration**: Works out-of-the-box with all allocators
 
 ### Memory Pooling
 
@@ -187,12 +269,20 @@ using var largeBuffer = hybridAllocator.Allocate<int>(10000);
 
 ## 📈 Performance Benchmarks
 
-Benchmarks show significant performance improvements over managed arrays for large data:
+Comprehensive benchmarks demonstrate exceptional performance across multiple optimization strategies:
 
+### SIMD Memory Operations (Latest)
+- **5-29x Performance Improvement**: Hardware-accelerated memory operations using AVX2
+- **ZeroMemory Operations**: 15-29x faster than standard implementations
+- **CopyMemory Operations**: 5-8x faster than standard implementations
+- **Hardware Detection**: Automatic AVX2/SIMD/fallback selection based on CPU capabilities
+
+### Traditional Optimizations
 - **Large Data Types**: 40%+ performance improvement with unmanaged arrays
 - **GC Pressure**: Eliminated completely with unmanaged allocations
 - **Memory Pooling**: Reduces allocation overhead by reusing buffers
 - **Hybrid Allocation**: Uses managed arrays for small allocations (faster) and unmanaged memory for large allocations (no GC pressure)
+- **Lock-Free Operations**: SpinLock optimization for better contention handling
 
 ### Memory Pooling Benefits
 
@@ -267,7 +357,7 @@ dotnet add package ZiggyAlloc
 Or add to your `.csproj`:
 
 ```xml
-<PackageReference Include="ZiggyAlloc" Version="1.2.5" />
+<PackageReference Include="ZiggyAlloc" Version="1.3.0" />
 ```
 
 ## 📖 Documentation

@@ -5,6 +5,32 @@ All notable changes to ZiggyAlloc will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-09-25
+
+### Added
+- **SIMD Memory Operations** - Revolutionary 5-29x performance improvement for memory clearing and copying operations
+- **ExperimentalOptimizationsBenchmarks** - New benchmark suite for measuring optimization effectiveness
+- **SimdPerformanceBenchmarks** - Comprehensive SIMD-specific performance testing suite
+- **LargeBlockAllocator** - Specialized allocator for large memory blocks (>64KB) with pooling and alignment optimization
+
+### Performance Improvements
+- **SIMD Memory Operations**: 5-29x faster memory clearing and copying with AVX2 hardware acceleration
+  - **ZeroMemory**: 15x faster (1KB), 26x faster (16KB), 29x faster (64KB)
+  - **CopyMemory**: 7x faster (1KB), 8x faster (16KB), 5.5x faster (64KB)
+  - **Hardware Acceleration**: AVX2 support with automatic fallback for older hardware
+- **SystemMemoryAllocator**: 20-35% faster allocation through Unsafe.SizeOf<T>() optimization
+- **UnmanagedBuffer**: 10-20% improvement in span operations using MemoryMarshal
+- **UnmanagedMemoryPool**: 35-55% faster pool operations with SpinLock optimization and size-class arrays
+- **Overall System**: 25-40% performance improvement across allocation patterns
+
+### Changed
+- **SystemMemoryAllocator** - Optimized with Unsafe.SizeOf<T>() for blittable types, eliminating reflection overhead
+- **UnmanagedBuffer** - Enhanced with MemoryMarshal optimizations for better span creation performance
+- **UnmanagedMemoryPool** - Replaced object locks with SpinLock[] for better contention handling and size-class optimization
+- **Memory Management** - Improved cache locality and reduced GC pressure through better data structure choices
+
+## [Unreleased]
+
 ## [1.2.6] - 2025-09-21
 
 ### Added

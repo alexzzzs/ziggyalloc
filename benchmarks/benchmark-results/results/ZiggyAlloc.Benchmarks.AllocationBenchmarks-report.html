@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>BenchmarkRun-joined-2025-09-21-23-35-29</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.13.12, Windows 11 (10.0.26100.6584)
+Unknown processor
+.NET SDK 9.0.304
+  [Host]   : .NET 9.0.8 (9.0.825.36511), X64 RyuJIT AVX2
+  .NET 9.0 : .NET 9.0.8 (9.0.825.36511), X64 RyuJIT AVX2
+</code></pre>
+<pre><code>Runtime=.NET 9.0  Server=True  
+</code></pre>
+
+<table>
+<thead><tr><th>Method         </th><th>Job</th><th>Toolchain       </th><th>Mean     </th><th>Error  </th><th>StdDev  </th><th>Median   </th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>ManagedArray_Small</td><td>.NET 9.0</td><td>Default</td><td>79.26 ns</td><td>1.604 ns</td><td>1.576 ns</td><td>79.05 ns</td><td>1.00</td><td>0.00</td><td>0.0113</td><td>-</td><td>-</td><td>424 B</td><td>1.00</td>
+</tr><tr><td>UnmanagedArray_Small</td><td>.NET 9.0</td><td>Default</td><td>138.87 ns</td><td>0.943 ns</td><td>0.836 ns</td><td>139.05 ns</td><td>1.75</td><td>0.04</td><td>0.0017</td><td>-</td><td>-</td><td>64 B</td><td>0.15</td>
+</tr><tr><td>ArrayPool_Small</td><td>.NET 9.0</td><td>Default</td><td>42.22 ns</td><td>0.381 ns</td><td>0.338 ns</td><td>42.15 ns</td><td>0.53</td><td>0.01</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>ManagedArray_Medium</td><td>.NET 9.0</td><td>Default</td><td>6,778.47 ns</td><td>134.753 ns</td><td>209.794 ns</td><td>6,825.33 ns</td><td>84.75</td><td>2.88</td><td>1.0529</td><td>-</td><td>-</td><td>40024 B</td><td>94.40</td>
+</tr><tr><td>UnmanagedArray_Medium</td><td>.NET 9.0</td><td>Default</td><td>5,024.58 ns</td><td>47.550 ns</td><td>42.152 ns</td><td>5,020.08 ns</td><td>63.43</td><td>1.48</td><td>-</td><td>-</td><td>-</td><td>64 B</td><td>0.15</td>
+</tr><tr><td>ArrayPool_Medium</td><td>.NET 9.0</td><td>Default</td><td>3,610.75 ns</td><td>16.482 ns</td><td>15.418 ns</td><td>3,610.69 ns</td><td>45.64</td><td>0.91</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>ManagedArray_Large</td><td>.NET 9.0</td><td>Default</td><td>1,062,002.53 ns</td><td>13,499.125 ns</td><td>11,966.623 ns</td><td>1,063,744.63 ns</td><td>13,407.11</td><td>321.78</td><td>998.0469</td><td>998.0469</td><td>998.0469</td><td>4000360 B</td><td>9,434.81</td>
+</tr><tr><td>UnmanagedArray_Large</td><td>.NET 9.0</td><td>Default</td><td>2,320,186.03 ns</td><td>68,665.464 ns</td><td>202,461.669 ns</td><td>2,249,531.25 ns</td><td>27,055.34</td><td>2,497.15</td><td>-</td><td>-</td><td>-</td><td>65 B</td><td>0.15</td>
+</tr><tr><td>ArrayPool_Large</td><td>.NET 9.0</td><td>Default</td><td>535,192.77 ns</td><td>14,988.563 ns</td><td>44,194.115 ns</td><td>552,816.78 ns</td><td>6,197.97</td><td>415.29</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>ManagedArray_Small</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>79.02 ns</td><td>1.543 ns</td><td>1.895 ns</td><td>78.77 ns</td><td>1.00</td><td>0.00</td><td>0.0337</td><td>-</td><td>-</td><td>424 B</td><td>1.000</td>
+</tr><tr><td>UnmanagedArray_Small</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>202.66 ns</td><td>1.284 ns</td><td>1.138 ns</td><td>203.09 ns</td><td>2.55</td><td>0.07</td><td>0.0050</td><td>-</td><td>-</td><td>64 B</td><td>0.151</td>
+</tr><tr><td>ArrayPool_Small</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>67.68 ns</td><td>0.356 ns</td><td>0.333 ns</td><td>67.71 ns</td><td>0.85</td><td>0.02</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0.000</td>
+</tr><tr><td>ManagedArray_Medium</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>6,574.42 ns</td><td>126.764 ns</td><td>130.177 ns</td><td>6,594.24 ns</td><td>82.86</td><td>2.55</td><td>3.1738</td><td>-</td><td>-</td><td>40024 B</td><td>94.396</td>
+</tr><tr><td>UnmanagedArray_Medium</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>12,207.51 ns</td><td>63.199 ns</td><td>49.342 ns</td><td>12,223.52 ns</td><td>153.53</td><td>4.04</td><td>-</td><td>-</td><td>-</td><td>64 B</td><td>0.151</td>
+</tr><tr><td>ArrayPool_Medium</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>6,156.00 ns</td><td>15.888 ns</td><td>14.862 ns</td><td>6,159.11 ns</td><td>77.58</td><td>1.89</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0.000</td>
+</tr><tr><td>ManagedArray_Large</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>1,581,672.64 ns</td><td>10,393.806 ns</td><td>9,722.373 ns</td><td>1,585,827.15 ns</td><td>19,932.34</td><td>521.46</td><td>998.0469</td><td>998.0469</td><td>998.0469</td><td>4004613 B</td><td>9,444.842</td>
+</tr><tr><td>UnmanagedArray_Large</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>1,747,018.08 ns</td><td>6,097.465 ns</td><td>5,405.244 ns</td><td>1,746,262.11 ns</td><td>21,999.97</td><td>556.74</td><td>-</td><td>-</td><td>-</td><td>75 B</td><td>0.177</td>
+</tr><tr><td>ArrayPool_Large</td><td>InProcess</td><td>InProcessEmitToolchain</td><td>399,648.03 ns</td><td>1,278.233 ns</td><td>1,195.660 ns</td><td>399,855.18 ns</td><td>5,036.21</td><td>121.13</td><td>-</td><td>-</td><td>-</td><td>3 B</td><td>0.007</td>
+</tr></tbody></table>
+</body>
+</html>

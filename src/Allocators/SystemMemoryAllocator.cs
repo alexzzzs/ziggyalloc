@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -14,6 +15,16 @@ namespace ZiggyAlloc
         private const string DEBUG_EXCEPTION_MEMORY_CLEANUP = "Exception during memory cleanup in SystemMemoryAllocator.Free";
 
         private long _totalAllocatedBytes = 0;
+
+        // Cache for common type sizes to avoid repeated Marshal.SizeOf calls
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, int> _typeSizeCache = new();
+
+        // Pre-computed sizes for common types
+        private static readonly int _byteSize = sizeof(byte);
+        private static readonly int _intSize = sizeof(int);
+        private static readonly int _longSize = sizeof(long);
+        private static readonly int _floatSize = sizeof(float);
+        private static readonly int _doubleSize = sizeof(double);
 
         /// <summary>
         /// Gets a value indicating that this allocator supports individual memory deallocation.
@@ -47,39 +58,83 @@ namespace ZiggyAlloc
                 return new UnmanagedBuffer<T>(null, 0, this);
             }
 
-            // Calculate element size once for performance
-            int elementSize = sizeof(T);
+            // Get element size from cache or compute once
+            int elementSize = GetElementSize<T>();
 
-            // Calculate total size with overflow checking
-            long totalSize;
-            try
-            {
-                totalSize = (long)elementCount * elementSize;
-            }
-            catch (OverflowException)
-            {
-                throw new OverflowException($"Allocation size overflow: {elementCount} elements of {elementSize} bytes each");
-            }
+            // Calculate total size using nuint for better performance
+            nuint totalSize = (nuint)elementCount * (nuint)elementSize;
 
+            // Check for overflow and size limits
             if (totalSize > int.MaxValue)
                 throw new OutOfMemoryException($"Allocation too large: {totalSize} bytes exceeds maximum allocation size");
 
-            IntPtr pointer = (IntPtr)NativeMemory.Alloc((nuint)totalSize);
+            IntPtr pointer = (IntPtr)NativeMemory.Alloc(totalSize);
 
             if (pointer == IntPtr.Zero)
                 throw new OutOfMemoryException($"Failed to allocate {totalSize} bytes for {elementCount} elements of type {typeof(T).Name}");
 
-            // Zero the memory if requested
+            // Optimized memory clearing based on size
             if (zeroMemory)
             {
-                var byteSpan = new Span<byte>((void*)pointer, (int)totalSize);
-                byteSpan.Clear();
+                ClearMemoryOptimized((void*)pointer, (int)totalSize);
             }
 
             // Update allocation tracking
-            Interlocked.Add(ref _totalAllocatedBytes, totalSize);
+            Interlocked.Add(ref _totalAllocatedBytes, (long)totalSize);
 
             return new UnmanagedBuffer<T>((T*)pointer, elementCount, this);
+        }
+
+        /// <summary>
+        /// Gets the size of type T, using cached values for common types.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int GetElementSize<T>() where T : unmanaged
+        {
+            var type = typeof(T);
+
+            // Fast path for common types
+            if (type == typeof(byte)) return _byteSize;
+            if (type == typeof(int)) return _intSize;
+            if (type == typeof(long)) return _longSize;
+            if (type == typeof(float)) return _floatSize;
+            if (type == typeof(double)) return _doubleSize;
+
+            // Use Unsafe.SizeOf for blittable types (much faster, no reflection)
+            if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+            {
+                // Fallback to Marshal.SizeOf for non-blittable types
+                var typeHandle = type.TypeHandle;
+                return _typeSizeCache.GetOrAdd(typeHandle, handle => Marshal.SizeOf(Type.GetTypeFromHandle(handle)));
+            }
+            else
+            {
+                // Use Unsafe.SizeOf for blittable types - eliminates reflection entirely!
+                return Unsafe.SizeOf<T>();
+            }
+        }
+
+        /// <summary>
+        /// Optimized memory clearing that uses the most efficient method based on size.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static unsafe void ClearMemoryOptimized(void* pointer, int size)
+        {
+            // For small sizes, use a simple loop (often faster than Span.Clear for very small sizes)
+            if (size <= 64)
+            {
+                byte* bytePtr = (byte*)pointer;
+                for (int i = 0; i < size; i++)
+                {
+                    bytePtr[i] = 0;
+                }
+            }
+            else
+            {
+                // For larger sizes, use Span.Clear which may use optimized instructions
+                var span = new Span<byte>(pointer, size);
+                span.Clear();
+            }
         }
 
         /// <summary>

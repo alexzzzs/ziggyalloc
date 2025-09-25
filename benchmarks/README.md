@@ -13,6 +13,23 @@ ZiggyAlloc delivers significant performance improvements over traditional manage
 - **Hybrid Allocation**: Automatically chooses optimal strategy based on data type and size
 - **Scalable Performance**: Performance advantages increase with data size
 
+## 🎛️ Benchmark Modes
+
+The comprehensive benchmark runners support several modes for different testing scenarios:
+
+### Available Modes
+
+| Mode | Description | Use Case | Benchmarks Included |
+|------|-------------|----------|-------------------|
+| **all** | Run all benchmark classes | Complete performance analysis | All 10 benchmark classes |
+| **quick** | Fast subset of benchmarks | Quick performance check | Allocation, Allocator, Pooling |
+| **experimental** | Latest optimization tests | Testing new features | ExperimentalOptimizationsBenchmarks |
+| **performance** | Performance-focused tests | Detailed performance analysis | Allocation, Multithreading, Pooling |
+| **comparison** | Compare different allocators | Choosing the right allocator | Comparison, DataType benchmarks |
+| **specific** | Single benchmark class | Targeted testing | User-specified class |
+
+### Benchmark Classes Overview
+
 ## 🧪 Benchmark Categories
 
 ### AllocationBenchmarks.cs
@@ -59,20 +76,80 @@ Benchmarks simulating real-world usage scenarios:
 
 ## 🚀 Running Benchmarks
 
-### Run All Benchmarks
+### Quick Start Scripts
+
+The easiest way to run benchmarks is using the comprehensive runner scripts:
+
+#### PowerShell (Recommended)
+```powershell
+# Run all benchmarks
+.\run-benchmarks.ps1
+
+# Run quick benchmarks only (faster)
+.\run-benchmarks.ps1 -Mode quick
+
+# Run experimental benchmarks
+.\run-benchmarks.ps1 -Mode experimental
+
+# Run specific benchmark class
+.\run-benchmarks.ps1 -Mode specific -Filter AllocationBenchmarks
+
+# Run with parallel execution and save results
+.\run-benchmarks.ps1 -Parallel -SaveResults
+
+# Show all options
+Get-Help .\run-benchmarks.ps1
+```
+
+#### Batch File (Windows)
+```cmd
+# Run all benchmarks
+run-benchmarks.bat
+
+# Run quick benchmarks only
+run-benchmarks.bat -mode quick
+
+# Run experimental benchmarks
+run-benchmarks.bat -mode experimental
+
+# Run specific benchmark class
+run-benchmarks.bat -mode specific -filter AllocationBenchmarks
+
+# Run with parallel execution and save results
+run-benchmarks.bat -parallel -save
+
+# Show all options
+run-benchmarks.bat -help
+```
+
+### Manual BenchmarkDotNet Commands
+
+#### Run All Benchmarks
 ```bash
 cd benchmarks
 dotnet run -c Release
 ```
 
-### Run Specific Benchmark Class
+#### Run Specific Benchmark Class
 ```bash
 dotnet run -c Release --filter *AllocationBenchmarks*
 ```
 
-### Run Specific Benchmark Method
+#### Run Specific Benchmark Method
 ```bash
 dotnet run -c Release --filter *AllocationBenchmarks*ManagedArray*
+```
+
+#### Advanced BenchmarkDotNet Options
+```bash
+# Run with parallel execution
+dotnet run -c Release --parallel --maxJobs 4
+
+# Save results to file
+dotnet run -c Release --exporters markdown --outPath results.md
+
+# Run with custom configuration
+dotnet run -c Release --filter *Benchmarks* --join
 ```
 
 ## 📈 Performance Results
@@ -159,8 +236,90 @@ graph TD
 4. **Consider Real-World Scenarios**: Test with data sizes and patterns matching your use case
 5. **Monitor GC Pressure**: Pay attention to allocated memory and GC collections
 
+## ⚙️ Advanced Features
+
+### Command-Line Options
+
+Both PowerShell and batch scripts support these options:
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `-Mode` | Benchmark mode to run | `-Mode quick` |
+| `-Filter` | Filter specific benchmark class | `-Filter AllocationBenchmarks` |
+| `-Configuration` | Build configuration | `-Configuration Release` |
+| `-Parallel` | Run benchmarks in parallel | `-Parallel` |
+| `-SaveResults` | Save results to markdown files | `-SaveResults` |
+| `-OutputDir` | Output directory for results | `-OutputDir results` |
+| `-MaxJobs` | Maximum parallel jobs | `-MaxJobs 8` |
+| `-SkipBuild` | Skip the build step | `-SkipBuild` |
+| `-Verbose` | Show detailed output | `-Verbose` |
+
+### Output and Results
+
+#### Console Output
+- Real-time progress updates
+- Execution time tracking
+- Error reporting with detailed messages
+- Usage examples at completion
+
+#### Saved Results (when using `-SaveResults`)
+- Timestamped markdown files
+- Complete benchmark statistics
+- Performance comparisons
+- Memory allocation metrics
+
+#### Example Output File
+```
+benchmark-results/benchmarks_20250121_143022.md
+```
+
+### Performance Monitoring
+
+The scripts automatically track:
+- **Build time**: Time to compile the benchmark project
+- **Execution time**: Total time for all benchmarks
+- **Individual benchmark timing**: Each benchmark class duration
+- **Success/failure status**: Clear indication of any issues
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **.NET SDK Not Found**
+   - Ensure .NET SDK is installed
+   - Verify `dotnet --version` works in terminal
+   - Scripts will show the detected version
+
+2. **Build Failures**
+   - Check for compilation errors
+   - Ensure all dependencies are available
+   - Try cleaning and rebuilding: `dotnet clean && dotnet build`
+
+3. **Benchmark Failures**
+   - Check console output for specific errors
+   - Verify benchmark methods are properly attributed
+   - Ensure test data is valid
+
+4. **Permission Issues**
+   - Run scripts from the benchmarks directory
+   - Ensure write permissions for output directory
+   - Use administrator privileges if needed
+
+### Getting Help
+
+```powershell
+# PowerShell help
+Get-Help .\run-benchmarks.ps1 -Detailed
+```
+
+```cmd
+# Batch file help
+run-benchmarks.bat -help
+```
+
 ## 📖 Related Documentation
 
 - [Main README](../README.md)
 - [Examples](../examples/README.md)
 - [API Documentation](../DOCUMENTATION.md)
+- [Performance Optimization Guide](../DEVELOPMENT.md#performance-optimization)

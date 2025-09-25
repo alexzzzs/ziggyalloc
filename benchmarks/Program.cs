@@ -11,7 +11,7 @@ namespace ZiggyAlloc.Benchmarks
         {
             Console.WriteLine("ZiggyAlloc Benchmarks");
             Console.WriteLine("====================");
-            
+
             // Use BenchmarkSwitcher to allow filtering
             var assembly = Assembly.GetEntryAssembly();
             if (assembly != null)
@@ -19,7 +19,7 @@ namespace ZiggyAlloc.Benchmarks
                 var switcher = new BenchmarkSwitcher(assembly);
                 switcher.Run(args);
             }
-            
+
             Console.WriteLine("Benchmarks completed!");
         }
     }

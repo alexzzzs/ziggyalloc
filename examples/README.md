@@ -108,6 +108,20 @@ Leak detection and debugging
 #### UnmanagedMemoryPool
 Reusing buffers to reduce allocation overhead
 
+#### LargeBlockAllocator
+Specialized allocator for large memory blocks with pooling and alignment
+
+```csharp
+var systemAllocator = new SystemMemoryAllocator();
+using var largeBlockAllocator = new LargeBlockAllocator(systemAllocator);
+
+// Large allocations automatically benefit from pooling and alignment
+using var largeBuffer = largeBlockAllocator.Allocate<byte>(1024 * 1024); // 1MB
+
+// Memory is automatically pooled for reuse
+using var anotherBuffer = largeBlockAllocator.Allocate<byte>(1024 * 1024); // Reuses pooled memory
+```
+
 ### Performance Examples
 These examples demonstrate performance optimization techniques:
 
@@ -202,6 +216,7 @@ graph TD
     D --> L[Scoped Allocator]
     D --> M[Debug Allocator]
     D --> N[Memory Pool]
+    D --> O[Large Block Allocator]
     
     E --> O[Pooling Performance]
     E --> P[GC Pressure Avoidance]

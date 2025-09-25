@@ -59,7 +59,7 @@ jobs:
       run: dotnet build --no-restore --configuration Release -p:Version=${{ steps.version.outputs.VERSION }} ZiggyAlloc.sln
       
     - name: Pack
-      run: dotnet pack --no-build --configuration Release --output ./artifacts -p:Version=${{ steps.version.outputs.VERSION }} ZiggyAlloc.Main.csproj
+      run: dotnet pack --no-build --configuration Release --output ./artifacts -p:Version=${{ steps.version.outputs.VERSION }} -p:IncludeContentInPack=true ZiggyAlloc.Main.csproj
       
     - name: Publish to NuGet
       run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Toolchains.InProcess;
 using ZiggyAlloc;
 
 namespace ZiggyAlloc.Benchmarks
@@ -9,6 +10,7 @@ namespace ZiggyAlloc.Benchmarks
     [SimpleJob(RuntimeMoniker.Net90)]
     [MemoryDiagnoser]
     [GcServer(true)]
+    [InProcess]
     public class AllocationBenchmarks
     {
         private const int SmallArraySize = 100;
