@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
+using System.Runtime.InteropServices;
 using System.Numerics;
 
 namespace ZiggyAlloc
@@ -20,7 +20,7 @@ namespace ZiggyAlloc
         /// <summary>
         /// Gets a value indicating whether AVX2 operations are supported.
         /// </summary>
-        public static bool IsAvx2Supported => Avx2.IsSupported;
+        public static bool IsAvx2Supported => RuntimeInformation.ProcessArchitecture == Architecture.X86 && Avx2.IsSupported;
 
         /// <summary>
         /// Zero-initializes memory using the most efficient method available.
@@ -55,6 +55,13 @@ namespace ZiggyAlloc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ZeroMemoryAvx2(void* ptr, int byteLength)
         {
+            // Double-check AVX2 support at runtime (in case platform detection fails)
+            if (!IsAvx2Supported)
+            {
+                ZeroMemoryStandard(ptr, byteLength);
+                return;
+            }
+
             byte* bytePtr = (byte*)ptr;
             int avxLength = byteLength / 32 * 32; // Process in 32-byte chunks
 
@@ -197,6 +204,13 @@ namespace ZiggyAlloc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void CopyMemoryAvx2(void* destination, void* source, int byteLength)
         {
+            // Double-check AVX2 support at runtime (in case platform detection fails)
+            if (!IsAvx2Supported)
+            {
+                CopyMemoryStandard(destination, source, byteLength);
+                return;
+            }
+
             byte* destPtr = (byte*)destination;
             byte* srcPtr = (byte*)source;
             int avxLength = byteLength / 32 * 32;
