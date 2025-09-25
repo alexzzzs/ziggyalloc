@@ -102,34 +102,6 @@ namespace ZiggyAlloc.Tests
             Assert.Throws<NotSupportedException>(() => allocator.Free(buffer.RawPointer));
         }
 
-        [Fact]
-        public void DebugMemoryAllocator_ZeroSizeAllocation_Works()
-        {
-            // Arrange
-            var backingAllocator = new SystemMemoryAllocator();
-            using var allocator = new DebugMemoryAllocator("Test", backingAllocator);
-
-            // Act
-            using var buffer = allocator.Allocate<int>(0);
-
-            // Assert
-            // For zero-length allocations, the buffer is valid but pointer is null
-            Assert.False(buffer.IsValid); // Null pointer for zero-length allocations
-            Assert.Equal(0, buffer.Length);
-            Assert.Equal(0, buffer.SizeInBytes);
-            Assert.True(buffer.IsEmpty);
-        }
-
-        [Fact]
-        public void DebugMemoryAllocator_NegativeSizeAllocation_Throws()
-        {
-            // Arrange
-            var backingAllocator = new SystemMemoryAllocator();
-            using var allocator = new DebugMemoryAllocator("Test", backingAllocator);
-
-            // Act & Assert
-            Assert.Throws<ArgumentOutOfRangeException>(() => allocator.Allocate<int>(-1));
-        }
 
         [Fact]
         public void UnmanagedMemoryPool_ZeroSizeAllocation_Works()

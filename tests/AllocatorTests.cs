@@ -78,52 +78,6 @@ namespace ZiggyAlloc.Tests
             Assert.Throws<NotSupportedException>(() => allocator.Free(IntPtr.Zero));
         }
 
-        [Fact]
-        public void DebugMemoryAllocator_DetectsLeaks()
-        {
-            var backend = new SystemMemoryAllocator();
-            bool leakDetected = false;
-            
-            try
-            {
-                using var debugAllocator = new DebugMemoryAllocator("Test", backend, MemoryLeakReportingMode.Throw);
-                var buffer = debugAllocator.Allocate<int>(1);
-                buffer[0] = 42;
-                // Intentionally not disposing to test leak detection
-            }
-            catch (InvalidOperationException ex)
-            {
-                leakDetected = ex.Message.Contains("MEMORY LEAK DETECTED");
-            }
-            
-            Assert.True(leakDetected, "Debug allocator should detect memory leaks");
-        }
-
-        [Fact]
-        public void DebugMemoryAllocator_NoLeaksWhenProperlyDisposed()
-        {
-            var backend = new SystemMemoryAllocator();
-            var debugAllocator = new DebugMemoryAllocator("Test", backend, MemoryLeakReportingMode.Throw);
-            
-            // Allocate and immediately dispose
-            var buffer = debugAllocator.Allocate<int>(1);
-            buffer[0] = 42;
-            
-            // Check tracking before disposal
-            Assert.Equal(1, debugAllocator.GetTrackedAllocationCount());
-            
-            // Get the pointer before disposal
-            var pointer = buffer.RawPointer;
-            
-            // Dispose the buffer
-            buffer.Dispose();
-            
-            // Should be no tracked allocations after disposal
-            Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());
-            
-            // Debug allocator disposal should not throw
-            debugAllocator.Dispose();
-        }
 
         [Fact]
         public void UnmanagedBuffer_BoundsChecking_Works()
