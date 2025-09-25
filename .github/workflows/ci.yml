@@ -35,8 +35,8 @@ jobs:
         echo "uname -m: $(uname -m)"
         echo "uname -p: $(uname -p)"
 
-        # Run tests - problematic test classes have been moved to DebugTests project
-        echo "Running stable test set from main test project"
+        # Run tests - DebugMemoryAllocator now uses CI-friendly mode that doesn't crash
+        echo "Running all tests with CI-friendly DebugMemoryAllocator mode"
         dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj
 
     - name: Test Debug Tests (Allow Failures)

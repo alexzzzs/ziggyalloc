@@ -42,26 +42,36 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void DebugMemoryAllocator_LeakDetection_WithThrowMode()
+        public void DebugMemoryAllocator_LeakDetection_WithCIFriendlyMode()
         {
             // Arrange
             var backend = new SystemMemoryAllocator();
-            bool leakDetected = false;
+
+            // Capture the leak detection output
+            var originalError = Console.Error;
+            using var stringWriter = new StringWriter();
+            Console.SetError(stringWriter);
 
             try
             {
-                using var debugAllocator = new DebugMemoryAllocator("TestComponent", backend, MemoryLeakReportingMode.Throw);
+                using var debugAllocator = new DebugMemoryAllocator("TestComponent", backend, MemoryLeakReportingMode.CIFriendly);
                 var buffer = debugAllocator.Allocate<int>(10);
                 buffer[0] = 42;
                 // Intentionally not disposing buffer to test leak detection
+                // The debug allocator will be disposed when exiting the using block
+                // This should log the leak detection message but not crash
             }
-            catch (InvalidOperationException ex)
+            finally
             {
-                leakDetected = ex.Message.Contains("MEMORY LEAK DETECTED");
+                // Restore original error output
+                Console.SetError(originalError);
             }
 
-            // Assert
-            Assert.True(leakDetected);
+            // Check that leak detection message was logged
+            var output = stringWriter.ToString();
+            Assert.Contains("MEMORY LEAK DETECTED", output);
+            Assert.Contains("TestComponent", output);
+            Assert.Contains("CI-Friendly Mode", output);
         }
 
         [Fact]

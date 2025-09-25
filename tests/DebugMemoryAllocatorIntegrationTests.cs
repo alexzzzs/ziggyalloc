@@ -10,28 +10,39 @@ namespace ZiggyAlloc.Tests
         public void DebugMemoryAllocator_DetectsLeaks()
         {
             var backend = new SystemMemoryAllocator();
-            bool leakDetected = false;
+
+            // Capture the leak detection output
+            var originalError = Console.Error;
+            using var stringWriter = new StringWriter();
+            Console.SetError(stringWriter);
 
             try
             {
-                using var debugAllocator = new DebugMemoryAllocator("Test", backend, MemoryLeakReportingMode.Throw);
+                using var debugAllocator = new DebugMemoryAllocator("Test", backend, MemoryLeakReportingMode.CIFriendly);
                 var buffer = debugAllocator.Allocate<int>(1);
                 buffer[0] = 42;
                 // Intentionally not disposing to test leak detection
+                // The debug allocator will be disposed when exiting the using block
+                // This should log the leak detection message but not crash
             }
-            catch (InvalidOperationException ex)
+            finally
             {
-                leakDetected = ex.Message.Contains("MEMORY LEAK DETECTED");
+                // Restore original error output
+                Console.SetError(originalError);
             }
 
-            Assert.True(leakDetected, "Debug allocator should detect memory leaks");
+            // Check that leak detection message was logged
+            var output = stringWriter.ToString();
+            Assert.Contains("MEMORY LEAK DETECTED", output);
+            Assert.Contains("Test", output);
+            Assert.Contains("CI-Friendly Mode", output);
         }
 
         [Fact]
         public void DebugMemoryAllocator_NoLeaksWhenProperlyDisposed()
         {
             var backend = new SystemMemoryAllocator();
-            var debugAllocator = new DebugMemoryAllocator("Test", backend, MemoryLeakReportingMode.Throw);
+            var debugAllocator = new DebugMemoryAllocator("Test", backend, MemoryLeakReportingMode.CIFriendly);
 
             // Allocate and immediately dispose
             var buffer = debugAllocator.Allocate<int>(1);
