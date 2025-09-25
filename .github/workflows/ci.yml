@@ -35,10 +35,10 @@ jobs:
         echo "uname -m: $(uname -m)"
         echo "uname -p: $(uname -p)"
 
-        # Run tests excluding problematic test categories that crash the test host
+        # Run tests excluding specific test classes that crash the test host
         # DebugMemoryAllocator tests are designed to crash when detecting memory leaks
-        echo "Running stable test set excluding problematic categories"
-        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "not (DebugMemoryAllocator_|AllocatorIntegration_|PerformanceRegression_)"
+        echo "Running stable test set excluding problematic test classes"
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "not (FullyQualifiedName~DebugMemoryAllocator|FullyQualifiedName~AllocatorIntegration|FullyQualifiedName~PerformanceRegression)"
       
     - name: Run examples
       run: dotnet run --project examples/Examples.csproj --configuration Release
