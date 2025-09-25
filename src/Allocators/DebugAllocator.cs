@@ -17,9 +17,7 @@ namespace ZiggyAlloc
         /// <summary>Throw an InvalidOperationException with leak details</summary>
         Throw,
         /// <summary>Break into the debugger when leaks are detected</summary>
-        Break,
-        /// <summary>Log leak information but don't crash (CI-friendly mode)</summary>
-        CIFriendly
+        Break
     }
 
     /// <summary>
@@ -279,12 +277,6 @@ namespace ZiggyAlloc
                     Console.Error.WriteLine(leakReport);
                     if (Debugger.IsAttached)
                         Debugger.Break();
-                    break;
-
-                case MemoryLeakReportingMode.CIFriendly:
-                    // Log the leak report but don't crash the test host
-                    Console.Error.WriteLine(leakReport);
-                    Console.Error.WriteLine("*** CI-Friendly Mode: Memory leaks detected but continuing execution ***");
                     break;
 
                 case MemoryLeakReportingMode.Log:
