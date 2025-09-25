@@ -103,6 +103,7 @@ public interface IUnmanagedMemoryAllocator
 4. **UnmanagedMemoryPool** - Reduces allocation overhead by reusing previously allocated buffers
 5. **HybridAllocator** - Automatically chooses between managed and unmanaged allocation based on size and type
 6. **SlabAllocator** - Pre-allocates large blocks and sub-allocates for high-frequency small allocations
+7. **LargeBlockAllocator** - Specialized allocator for large memory blocks (>64KB) with pooling and alignment
 
 ### UnmanagedBuffer<T>
 

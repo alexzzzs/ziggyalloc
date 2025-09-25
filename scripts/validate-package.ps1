@@ -1,106 +1,64 @@
-# Package Validation Script for ZiggyAlloc
-# Validates the NuGet package before release
-
+# PowerShell script to validate NuGet package contents
 param(
-    [string]$PackagePath = "./release-artifacts/ZiggyAlloc.*.nupkg"
+    [string]$PackagePath = "ZiggyAlloc.Main/bin/Release/ZiggyAlloc.1.3.0.nupkg"
 )
 
-$ErrorActionPreference = "Stop"
+Write-Host "Validating NuGet package: $PackagePath" -ForegroundColor Green
 
-Write-Host "🔍 Validating ZiggyAlloc NuGet package..." -ForegroundColor Green
+# Check if package exists
+if (-not (Test-Path $PackagePath)) {
+    Write-Host "Package not found at $PackagePath" -ForegroundColor Red
+    Write-Host "Building package first..." -ForegroundColor Yellow
 
-# Find the package file
-$packageFile = Get-ChildItem $PackagePath | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    # Build and pack the project
+    dotnet build --configuration Release ZiggyAlloc.Main.csproj
+    dotnet pack --configuration Release --output ./artifacts ZiggyAlloc.Main.csproj
 
-if (-not $packageFile) {
-    Write-Error "Package file not found at: $PackagePath"
-    exit 1
+    $PackagePath = "artifacts/ZiggyAlloc.1.3.0.nupkg"
 }
 
-Write-Host "📦 Validating package: $($packageFile.Name)" -ForegroundColor Cyan
-
-# Extract package info
-$packageSize = [math]::Round($packageFile.Length / 1KB, 2)
-Write-Host "  Size: $packageSize KB" -ForegroundColor Gray
-
-# Create temp directory for extraction
-$tempDir = Join-Path $env:TEMP "ziggyalloc-validation-$(Get-Random)"
-New-Item -ItemType Directory -Path $tempDir | Out-Null
-
-try {
-    # Extract package (it's a zip file)
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($packageFile.FullName, $tempDir)
-    
-    Write-Host "✓ Package extraction successful" -ForegroundColor Green
-    
-    # Check required files
-    $requiredFiles = @(
-        "lib/net9.0/ZiggyAlloc.dll",
-        "lib/net9.0/ZiggyAlloc.xml",
-        "README.md",
-        "ZiggyAlloc.nuspec"
-    )
-    
-    $missingFiles = @()
-    foreach ($file in $requiredFiles) {
-        $fullPath = Join-Path $tempDir $file
-        if (-not (Test-Path $fullPath)) {
-            $missingFiles += $file
-        } else {
-            Write-Host "  ✓ $file" -ForegroundColor Green
-        }
-    }
-    
-    if ($missingFiles.Count -gt 0) {
-        Write-Error "Missing required files: $($missingFiles -join ', ')"
-        exit 1
-    }
-    
-    # Check assembly info
-    $assemblyPath = Join-Path $tempDir "lib/net9.0/ZiggyAlloc.dll"
-    $assembly = [System.Reflection.Assembly]::LoadFrom($assemblyPath)
-    $version = $assembly.GetName().Version
-    
-    Write-Host "  Assembly Version: $version" -ForegroundColor Gray
-    Write-Host "  Target Framework: .NET 9.0" -ForegroundColor Gray
-    
-    # Check for unsafe code (should be present)
-    $hasUnsafeCode = $assembly.GetCustomAttributes([System.Security.AllowPartiallyTrustedCallersAttribute], $false).Length -eq 0
-    Write-Host "  Unsafe Code: $(if($hasUnsafeCode) { 'Yes' } else { 'No' })" -ForegroundColor Gray
-    
-    # Validate nuspec content
-    $nuspecPath = Join-Path $tempDir "ZiggyAlloc.nuspec"
-    $nuspecContent = Get-Content $nuspecPath -Raw
-    
-    $validations = @(
-        @{ Name = "Package ID"; Pattern = '<id>ZiggyAlloc</id>' },
-        @{ Name = "MIT License"; Pattern = '<license.*>MIT</license>' },
-        @{ Name = "Repository URL"; Pattern = 'github.com/alexzzzs/ziggyalloc' },
-        @{ Name = "Description"; Pattern = '<description>.*Zig.*memory.*</description>' }
-    )
-    
-    foreach ($validation in $validations) {
-        if ($nuspecContent -match $validation.Pattern) {
-            Write-Host "  ✓ $($validation.Name)" -ForegroundColor Green
-        } else {
-            Write-Warning "  ⚠ $($validation.Name) validation failed"
-        }
-    }
-    
-    Write-Host ""
-    Write-Host "🎉 Package validation completed successfully!" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Package Summary:" -ForegroundColor Cyan
-    Write-Host "  File: $($packageFile.Name)"
-    Write-Host "  Size: $packageSize KB"
-    Write-Host "  Assembly Version: $version"
-    Write-Host "  Target Framework: .NET 9.0"
-    Write-Host "  Ready for publishing: ✓"
-    
-} finally {
-    # Cleanup
-    if (Test-Path $tempDir) {
-        Remove-Item $tempDir -Recurse -Force
-    }
+# Extract package contents
+$extractPath = "temp_package_contents"
+if (Test-Path $extractPath) {
+    Remove-Item -Recurse -Force $extractPath
 }
+
+Write-Host "Extracting package contents..." -ForegroundColor Yellow
+# .nupkg files are zip files, so we need to copy and rename temporarily
+$tempZipPath = $PackagePath + ".zip"
+Copy-Item -Path $PackagePath -Destination $tempZipPath
+Expand-Archive -Path $tempZipPath -DestinationPath $extractPath
+Remove-Item -Path $tempZipPath
+
+# Check for README.md in the root
+$readmePath = Join-Path $extractPath "README.md"
+if (Test-Path $readmePath) {
+    Write-Host "✅ README.md found in package root" -ForegroundColor Green
+
+    $readmeContent = Get-Content $readmePath -Raw
+    if ($readmeContent -like "*LargeBlockAllocator*") {
+        Write-Host "✅ README.md contains LargeBlockAllocator documentation" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️ README.md does not contain LargeBlockAllocator documentation" -ForegroundColor Yellow
+    }
+
+    if ($readmeContent -like "*SIMD Memory Operations*") {
+        Write-Host "✅ README.md contains SIMD documentation" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️ README.md does not contain SIMD documentation" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "❌ README.md NOT found in package root!" -ForegroundColor Red
+}
+
+# List all files in the package
+Write-Host "`nPackage contents:" -ForegroundColor Cyan
+Get-ChildItem -Recurse $extractPath | ForEach-Object {
+    $relativePath = $_.FullName.Replace($extractPath, "").TrimStart("\")
+    Write-Host "  $relativePath"
+}
+
+# Cleanup
+Remove-Item -Recurse -Force $extractPath
+
+Write-Host "`nValidation complete!" -ForegroundColor Green

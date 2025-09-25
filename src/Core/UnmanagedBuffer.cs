@@ -179,7 +179,7 @@ namespace ZiggyAlloc
             if (_pointer == null)
                 return Span<T>.Empty;
             
-            return new Span<T>(_pointer, _length);
+            return MemoryMarshal.CreateSpan(ref *_pointer, _length);
         }
 
         /// <summary>
@@ -215,7 +215,7 @@ namespace ZiggyAlloc
             if (_pointer == null)
                 return ReadOnlySpan<T>.Empty;
             
-            return new ReadOnlySpan<T>(_pointer, _length);
+            return MemoryMarshal.CreateReadOnlySpan(ref *_pointer, _length);
         }
 
         /// <summary>

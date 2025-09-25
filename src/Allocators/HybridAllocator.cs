@@ -7,10 +7,12 @@ namespace ZiggyAlloc
 {
     /// <summary>
     /// An allocator that automatically chooses between managed and unmanaged allocation based on size and type.
+    /// Uses optimized strategies for different allocation sizes.
     /// </summary>
     public sealed class HybridAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
         private readonly IUnmanagedMemoryAllocator _unmanagedAllocator;
+        private readonly LargeBlockAllocator _largeBlockAllocator;
         private long _totalAllocatedBytes;
         private bool _disposed = false;
 
@@ -23,6 +25,7 @@ namespace ZiggyAlloc
         // Constants for allocation strategy calculations
         private const int MIN_THRESHOLD = 32; // Minimum threshold for unknown types
         private const int MAX_THRESHOLD = 1024; // Maximum threshold for unknown types
+        private const int LARGE_BLOCK_THRESHOLD = 64 * 1024; // 64KB threshold for large block optimization
 
         /// <summary>
         /// Gets a value indicating that this allocator supports individual memory deallocation.
@@ -47,6 +50,7 @@ namespace ZiggyAlloc
         public HybridAllocator(IUnmanagedMemoryAllocator unmanagedAllocator)
         {
             _unmanagedAllocator = unmanagedAllocator ?? throw new ArgumentNullException(nameof(unmanagedAllocator));
+            _largeBlockAllocator = new LargeBlockAllocator(unmanagedAllocator, LARGE_BLOCK_THRESHOLD);
         }
 
         /// <summary>
@@ -82,13 +86,27 @@ namespace ZiggyAlloc
 
             if (useUnmanaged)
             {
-                // Use unmanaged allocation for larger allocations where GC pressure is a concern
-                var buffer = _unmanagedAllocator.Allocate<T>(elementCount, zeroMemory);
-                
-                // Update allocation tracking
-                Interlocked.Add(ref _totalAllocatedBytes, totalSize);
-                
-                return new UnmanagedBuffer<T>((T*)buffer.RawPointer, elementCount, this);
+                // Check if this is a very large allocation that should use optimized large block allocation
+                if (totalSize >= LARGE_BLOCK_THRESHOLD)
+                {
+                    // Use optimized large block allocation
+                    var buffer = _largeBlockAllocator.Allocate<T>(elementCount, zeroMemory);
+
+                    // Update allocation tracking
+                    Interlocked.Add(ref _totalAllocatedBytes, totalSize);
+
+                    return new UnmanagedBuffer<T>((T*)buffer.RawPointer, elementCount, this);
+                }
+                else
+                {
+                    // Use standard unmanaged allocation for medium-sized allocations
+                    var buffer = _unmanagedAllocator.Allocate<T>(elementCount, zeroMemory);
+
+                    // Update allocation tracking
+                    Interlocked.Add(ref _totalAllocatedBytes, totalSize);
+
+                    return new UnmanagedBuffer<T>((T*)buffer.RawPointer, elementCount, this);
+                }
             }
             else
             {
@@ -200,9 +218,24 @@ namespace ZiggyAlloc
 
             try
             {
-                // Delegate to the unmanaged allocator for unmanaged memory
-                _unmanagedAllocator.Free(pointer);
-                // Note: Managed arrays are automatically cleaned up by the GC when the UnmanagedBuffer is disposed
+                // Check if this is an aligned allocation from LargeBlockAllocator
+                // LargeBlockAllocator stores the original pointer before the aligned address
+                unsafe
+                {
+                    IntPtr* header = (IntPtr*)((nuint)pointer - (nuint)sizeof(IntPtr));
+                    IntPtr originalPointer = *header;
+
+                    if (originalPointer != IntPtr.Zero)
+                    {
+                        // This was an aligned allocation from LargeBlockAllocator, free it there
+                        _largeBlockAllocator.Free(pointer);
+                    }
+                    else
+                    {
+                        // This wasn't an aligned allocation, delegate to base allocator
+                        _unmanagedAllocator.Free(pointer);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -220,12 +253,24 @@ namespace ZiggyAlloc
         /// <remarks>
         /// The unmanaged allocator is not disposed here as this allocator does not own it.
         /// The owner of the HybridAllocator is responsible for disposing the underlying allocator.
+        /// The LargeBlockAllocator is disposed here as it is owned by this allocator.
         /// </remarks>
         public void Dispose()
         {
             if (!_disposed)
             {
                 _disposed = true;
+                try
+                {
+                    _largeBlockAllocator?.Dispose();
+                }
+                catch (Exception ex)
+                {
+#if DEBUG
+                    System.Diagnostics.Debug.WriteLine($"Exception during LargeBlockAllocator disposal: {ex}");
+#endif
+                    // Continue with disposal even if large block allocator disposal fails
+                }
                 // The unmanaged allocator should be disposed by its owner
                 // We don't dispose it here as we don't own it
             }
