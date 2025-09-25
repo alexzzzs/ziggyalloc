@@ -38,7 +38,7 @@ jobs:
         # Run tests excluding specific test classes that crash the test host
         # DebugMemoryAllocator tests are designed to crash when detecting memory leaks
         echo "Running stable test set excluding problematic test classes"
-        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "not (FullyQualifiedName~DebugMemoryAllocator|FullyQualifiedName~AllocatorIntegration|FullyQualifiedName~PerformanceRegression)"
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "not (TestClassName~DebugMemoryAllocator|TestClassName~AllocatorIntegration|TestClassName~PerformanceRegression)"
       
     - name: Run examples
       run: dotnet run --project examples/Examples.csproj --configuration Release
