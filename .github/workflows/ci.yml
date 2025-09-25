@@ -31,11 +31,13 @@ jobs:
       
     - name: Test
       run: |
-        # Run tests with platform-specific exclusions for ARM64 compatibility
-        if [ "${{ runner.arch }}" = "ARM64" ]; then
+        # Detect platform and run tests accordingly
+        if [ "${RUNNER_ARCH}" = "ARM64" ] || [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+          echo "Running on ARM64 platform - using limited test set"
           # On ARM64, exclude tests that may have platform-specific issues
           dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "not (DebugMemoryAllocator_LeakDetection_WithThrowMode|DebugMemoryAllocator_DetectsLeaks|DebugMemoryAllocator_NoLeaksWhenProperlyDisposed|DebugMemoryAllocator_WithSystemMemoryAllocator_TracksAllocations|UnmanagedMemoryPool_WithDebugMemoryAllocator_Integration|SlabAllocator_WithDebugMemoryAllocator_Integration|AllocatorChain_SystemToDebugToPool_Works|AllocatorChain_SystemToSlabToDebug_Works|DebugMemoryAllocator_ThreadSafety_Works|DebugMemoryAllocator_ConcurrentAllocations_ThreadSafe|DebugMemoryAllocator_GetTrackedAllocationCount_AfterDispose|DebugMemoryAllocator_ProperDisposal_RemovesTracking|DebugMemoryAllocator_BasicAllocation_Works|DebugMemoryAllocator_MultipleAllocations_TrackedCorrectly|DebugMemoryAllocator_LeakDetection_WithLogMode|DebugMemoryAllocator_EmptyAllocation_HandledCorrectly|DebugMemoryAllocator_GetTrackedAllocationCount_Works|DebugMemoryAllocator_ZeroMemoryFlag_Works|DebugMemoryAllocator_NegativeSize_ThrowsException|DebugMemoryAllocator_UseAfterDispose_ThrowsObjectDisposedException|DebugMemoryAllocator_VeryLargeAllocation_TrackedCorrectly|DebugMemoryAllocator_StructTypeAllocation_TrackedCorrectly|DebugMemoryAllocator_EmptyAllocation_NotTracked|DebugMemoryAllocator_DisposeMultipleTimes_HandledGracefully|DebugMemoryAllocator_LargeNumberOfAllocations_TrackedCorrectly|DebugMemoryAllocator_MultipleDisposeOperations_TrackedCorrectly)"
         else
+          echo "Running on x86/x64 platform - running all tests"
           # On x86/x64, run all tests
           dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj
         fi

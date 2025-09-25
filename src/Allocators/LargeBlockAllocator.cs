@@ -137,13 +137,47 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Optimized memory clearing for large blocks using SIMD operations.
+        /// Optimized memory clearing for large blocks using platform-safe operations.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe void ClearLargeMemory(void* pointer, int size)
         {
-            // Use SIMD-optimized clearing for all sizes
-            SimdMemoryOperations.ZeroMemory(pointer, size);
+            // Use platform-safe memory clearing
+            if (size <= 0) return;
+
+            // For large blocks, use the most efficient method available
+            byte* bytePtr = (byte*)pointer;
+
+            // Use SIMD if available and supported, otherwise use standard clearing
+            if (SimdMemoryOperations.IsSimdSupported && size >= 16)
+            {
+                // Use standard SIMD operations (not AVX2-specific)
+                var span = new Span<byte>(pointer, size);
+                span.Clear();
+            }
+            else
+            {
+                // Fallback to standard byte-by-byte clearing for large blocks
+                // Use unrolled loop for better performance
+                int unrolledLength = size / 8 * 8;
+                for (int i = 0; i < unrolledLength; i += 8)
+                {
+                    bytePtr[i] = 0;
+                    bytePtr[i + 1] = 0;
+                    bytePtr[i + 2] = 0;
+                    bytePtr[i + 3] = 0;
+                    bytePtr[i + 4] = 0;
+                    bytePtr[i + 5] = 0;
+                    bytePtr[i + 6] = 0;
+                    bytePtr[i + 7] = 0;
+                }
+
+                // Handle remaining bytes
+                for (int i = unrolledLength; i < size; i++)
+                {
+                    bytePtr[i] = 0;
+                }
+            }
         }
 
         /// <summary>
