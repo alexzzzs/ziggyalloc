@@ -132,6 +132,7 @@ namespace ZiggyAlloc
             else
             {
                 // For larger sizes, use Span.Clear which may use optimized instructions
+                // Use safer approach for ARM64 compatibility
                 var span = new Span<byte>(pointer, size);
                 span.Clear();
             }
@@ -192,6 +193,9 @@ namespace ZiggyAlloc
         {
             if (span.Length < 0)
                 throw new ArgumentOutOfRangeException(nameof(span), "Span length cannot be negative");
+
+            if (span.Length == 0)
+                return new UnmanagedBuffer<T>(null, 0);
 
             fixed (T* pointer = span)
             {
