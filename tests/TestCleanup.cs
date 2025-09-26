@@ -43,10 +43,14 @@ namespace ZiggyAlloc.Tests
         public static void UnregisterAllocation(IntPtr pointer)
         {
             // Remove from tracked allocations (this is a simple implementation)
-            var toRemove = _trackedAllocations.Where(p => p == pointer).ToList();
-            foreach (var ptr in toRemove)
+            // Note: This is a basic implementation - for production use, consider a more efficient approach
+            var tempList = _trackedAllocations.ToArray();
+            foreach (var ptr in tempList)
             {
-                _trackedAllocations.TryTake(out _);
+                if (ptr == pointer)
+                {
+                    _trackedAllocations.TryTake(out _);
+                }
             }
         }
 
