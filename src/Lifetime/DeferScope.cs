@@ -57,23 +57,30 @@ namespace ZiggyAlloc
                 return;
 
             List<Exception>? exceptions = null;
-            var actions = new List<Action>();
 
-            // Atomically get all actions to execute (prevents race conditions)
-            lock (_deferredActions)
+            // Execute all deferred actions in LIFO order (maintain original behavior)
+            // Use a loop that continues until the stack is empty, handling concurrent modifications
+            while (true)
             {
-                while (_deferredActions.Count > 0)
+                Action? action = null;
+
+                // Atomically get the next action to execute
+                lock (_deferredActions)
                 {
-                    actions.Add(_deferredActions.Pop());
+                    if (_deferredActions.Count > 0)
+                    {
+                        action = _deferredActions.Pop();
+                    }
+                    else
+                    {
+                        break; // No more actions to execute
+                    }
                 }
-            }
 
-            // Execute all deferred actions in reverse order (outside lock for performance)
-            for (int i = actions.Count - 1; i >= 0; i--)
-            {
+                // Execute the action outside the lock for performance
                 try
                 {
-                    actions[i].Invoke();
+                    action.Invoke();
                 }
                 catch (Exception ex)
                 {
