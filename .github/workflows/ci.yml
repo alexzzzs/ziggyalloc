@@ -28,10 +28,16 @@ jobs:
       
     - name: Build
       run: |
-        echo "Building with forced clean to avoid cached artifacts..."
-        # Force clean build by removing any existing artifacts
-        rm -rf bin/ obj/ tests/bin/ tests/obj/ 2>/dev/null || true
-        dotnet build --no-restore --configuration Release --force ZiggyAlloc.sln
+        echo "Building with cache-busting approach..."
+        # Clean build artifacts but preserve project structure
+        rm -rf bin/ tests/bin/ 2>/dev/null || true
+        # Clean compiled binaries from obj directories but keep project.assets.json
+        find . -name "obj" -type d -exec rm -rf {}/Debug {} \; 2>/dev/null || true
+        find . -name "obj" -type d -exec rm -rf {}/Release {} \; 2>/dev/null || true
+        # Ensure fresh restore before building
+        echo "Ensuring dependencies are restored..."
+        dotnet restore ZiggyAlloc.sln --force
+        dotnet build --configuration Release ZiggyAlloc.sln
       
     - name: Test
       run: |
