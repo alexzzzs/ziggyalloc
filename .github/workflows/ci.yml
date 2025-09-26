@@ -30,14 +30,25 @@ jobs:
       run: |
         echo "Building with cache-busting approach..."
         # Clean build artifacts but preserve project structure
-        rm -rf bin/ tests/bin/ 2>/dev/null || true
-        # Clean compiled binaries from obj directories but keep project.assets.json
-        find . -name "obj" -type d -exec rm -rf {}/Debug {} \; 2>/dev/null || true
-        find . -name "obj" -type d -exec rm -rf {}/Release {} \; 2>/dev/null || true
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows commands
+          if (Test-Path "bin") { Remove-Item -Recurse -Force "bin" -ErrorAction SilentlyContinue }
+          if (Test-Path "tests/bin") { Remove-Item -Recurse -Force "tests/bin" -ErrorAction SilentlyContinue }
+          Get-ChildItem -Directory -Name "obj" | ForEach-Object {
+            if (Test-Path "$_/Debug") { Remove-Item -Recurse -Force "$_/Debug" -ErrorAction SilentlyContinue }
+            if (Test-Path "$_/Release") { Remove-Item -Recurse -Force "$_/Release" -ErrorAction SilentlyContinue }
+          }
+        else
+          # Unix/Linux commands
+          rm -rf bin/ tests/bin/ 2>/dev/null || true
+          find . -name "obj" -type d -exec rm -rf {}/Debug {} \; 2>/dev/null || true
+          find . -name "obj" -type d -exec rm -rf {}/Release {} \; 2>/dev/null || true
+        fi
         # Ensure fresh restore before building
         echo "Ensuring dependencies are restored..."
         dotnet restore ZiggyAlloc.sln --force
         dotnet build --configuration Release ZiggyAlloc.sln
+      shell: pwsh
       
     - name: Test
       run: |
@@ -71,10 +82,12 @@ jobs:
 
         # Clean up memory before running more tests
         echo "Performing comprehensive memory cleanup between test batches..."
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          taskkill /f /im dotnet.exe 2>/dev/null || true
-          taskkill /f /im testhost.exe 2>/dev/null || true
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows process cleanup
+          taskkill /f /im dotnet.exe 2>$null | Out-Null
+          taskkill /f /im testhost.exe 2>$null | Out-Null
         else
+          # Unix/Linux process cleanup
           pkill -f dotnet 2>/dev/null || true
           pkill -f testhost 2>/dev/null || true
         fi
@@ -93,14 +106,22 @@ jobs:
 
         # Clean up again
         echo "Performing final memory cleanup..."
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          taskkill /f /im dotnet.exe 2>/dev/null || true
-          taskkill /f /im testhost.exe 2>/dev/null || true
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows process cleanup
+          taskkill /f /im dotnet.exe 2>$null | Out-Null
+          taskkill /f /im testhost.exe 2>$null | Out-Null
         else
+          # Unix/Linux process cleanup
           pkill -f dotnet 2>/dev/null || true
           pkill -f testhost 2>/dev/null || true
         fi
-        sleep 5
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows sleep
+          Start-Sleep -Seconds 5
+        else
+          # Unix/Linux sleep
+          sleep 5
+        fi
 
         # Final comprehensive cleanup
         echo "Performing final comprehensive cleanup..."
@@ -117,14 +138,22 @@ jobs:
 
         # Clean up memory between batches
         echo "Performing memory cleanup between UnmanagedBuffer and UnmanagedMemoryPool tests..."
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          taskkill /f /im dotnet.exe 2>/dev/null || true
-          taskkill /f /im testhost.exe 2>/dev/null || true
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows process cleanup
+          taskkill /f /im dotnet.exe 2>$null | Out-Null
+          taskkill /f /im testhost.exe 2>$null | Out-Null
         else
+          # Unix/Linux process cleanup
           pkill -f dotnet 2>/dev/null || true
           pkill -f testhost 2>/dev/null || true
         fi
-        sleep 5
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows sleep
+          Start-Sleep -Seconds 5
+        else
+          # Unix/Linux sleep
+          sleep 5
+        fi
 
         echo "Running UnmanagedMemoryPool tests..."
         dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "UnmanagedMemoryPoolTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-memory-pool.trx" --blame --blame-hang-timeout 30s || {
@@ -136,14 +165,22 @@ jobs:
 
         # Clean up memory between batches
         echo "Performing memory cleanup between UnmanagedMemoryPool and HybridAllocator tests..."
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          taskkill /f /im dotnet.exe 2>/dev/null || true
-          taskkill /f /im testhost.exe 2>/dev/null || true
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows process cleanup
+          taskkill /f /im dotnet.exe 2>$null | Out-Null
+          taskkill /f /im testhost.exe 2>$null | Out-Null
         else
+          # Unix/Linux process cleanup
           pkill -f dotnet 2>/dev/null || true
           pkill -f testhost 2>/dev/null || true
         fi
-        sleep 5
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows sleep
+          Start-Sleep -Seconds 5
+        else
+          # Unix/Linux sleep
+          sleep 5
+        fi
 
         echo "Running HybridAllocator and DeferScope tests..."
         dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "HybridAllocatorTests|DeferScopeTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-hybrid-defer.trx" --blame --blame-hang-timeout 30s || {
@@ -155,14 +192,22 @@ jobs:
 
         # Clean up memory between batches
         echo "Performing memory cleanup between HybridAllocator and final tests..."
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          taskkill /f /im dotnet.exe 2>/dev/null || true
-          taskkill /f /im testhost.exe 2>/dev/null || true
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows process cleanup
+          taskkill /f /im dotnet.exe 2>$null | Out-Null
+          taskkill /f /im testhost.exe 2>$null | Out-Null
         else
+          # Unix/Linux process cleanup
           pkill -f dotnet 2>/dev/null || true
           pkill -f testhost 2>/dev/null || true
         fi
-        sleep 5
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows sleep
+          Start-Sleep -Seconds 5
+        else
+          # Unix/Linux sleep
+          sleep 5
+        fi
 
         echo "Running final ScopedMemoryAllocator and SlabAllocator tests..."
         dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "ScopedMemoryAllocatorTests|SlabAllocatorTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-final.trx" --blame --blame-hang-timeout 30s || {
@@ -175,10 +220,12 @@ jobs:
 
         # Additional error handling and cleanup
         echo "Performing cleanup and checking for any remaining processes..."
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          taskkill /f /im dotnet.exe 2>/dev/null || true
-          taskkill /f /im testhost.exe 2>/dev/null || true
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows process cleanup
+          taskkill /f /im dotnet.exe 2>$null | Out-Null
+          taskkill /f /im testhost.exe 2>$null | Out-Null
         else
+          # Unix/Linux process cleanup
           pkill -f dotnet 2>/dev/null || true
           pkill -f testhost 2>/dev/null || true
         fi
@@ -186,8 +233,14 @@ jobs:
         # Collect crash dumps on ARM64 for debugging
         if [[ "$RUNNER_ARCH" == "ARM64" || "$(uname -m)" == "arm64" ]]; then
           echo "ARM64 detected - collecting crash dumps for analysis..."
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            # Create crash dump directory
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # Windows crash dump collection
+            mkdir -p crash-dumps 2>$null
+            # On Windows, check for .dmp files in common locations
+            if (Test-Path "C:\dumps") { Copy-Item "C:\dumps\*" "crash-dumps/" -ErrorAction SilentlyContinue }
+            Get-ChildItem "crash-dumps" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            # Linux crash dump collection
             mkdir -p crash-dumps
             # Try to collect any core dumps
             if [ -d "/var/lib/systemd/coredump" ]; then
@@ -195,8 +248,8 @@ jobs:
             fi
             # List any crash dump files
             ls -la crash-dumps/ 2>/dev/null || echo "No crash dumps found"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            # On macOS, check for crash reports
+          else
+            # macOS crash dump collection
             mkdir -p crash-dumps
             if [ -d "$HOME/Library/Logs/DiagnosticReports" ]; then
               cp "$HOME/Library/Logs/DiagnosticReports"/* crash-dumps/ 2>/dev/null || true
