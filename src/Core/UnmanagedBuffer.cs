@@ -176,7 +176,7 @@ namespace ZiggyAlloc
         {
             ThrowIfDisposed();
             // For zero-length buffers, return an empty span instead of throwing
-            if (_pointer == null || _length == 0)
+            if (_pointer == null)
                 return Span<T>.Empty;
 
             // Use safer approach for ARM64 compatibility
@@ -213,7 +213,7 @@ namespace ZiggyAlloc
         {
             ThrowIfDisposed();
             // For zero-length buffers, return an empty span instead of throwing
-            if (_pointer == null || _length == 0)
+            if (_pointer == null)
                 return ReadOnlySpan<T>.Empty;
 
             // Use safer approach for ARM64 compatibility

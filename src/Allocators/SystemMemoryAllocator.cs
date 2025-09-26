@@ -194,9 +194,6 @@ namespace ZiggyAlloc
             if (span.Length < 0)
                 throw new ArgumentOutOfRangeException(nameof(span), "Span length cannot be negative");
 
-            if (span.Length == 0)
-                return new UnmanagedBuffer<T>(null, 0);
-
             fixed (T* pointer = span)
             {
                 return new UnmanagedBuffer<T>(pointer, span.Length);
