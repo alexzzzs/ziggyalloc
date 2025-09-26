@@ -24,12 +24,13 @@ namespace ZiggyAlloc.Tests
         protected SystemMemoryAllocator Allocator => _allocator;
 
         /// <summary>
-        /// Creates a buffer and registers it for cleanup.
+        /// Creates a buffer and registers it for cleanup and leak detection.
         /// </summary>
         protected UnmanagedBuffer<T> CreateBuffer<T>(int elementCount, bool zeroMemory = false) where T : unmanaged
         {
             var buffer = _allocator.Allocate<T>(elementCount, zeroMemory);
             TestCleanup.RegisterBuffer(buffer);
+            TestCleanup.RegisterAllocation(buffer.RawPointer);
             return buffer;
         }
 
@@ -56,8 +57,8 @@ namespace ZiggyAlloc.Tests
 
             if (disposing)
             {
-                // Perform defensive cleanup
-                TestCleanup.Cleanup();
+                // Perform comprehensive cleanup with leak detection
+                TestCleanup.ComprehensiveCleanup();
             }
 
             _disposed = true;
@@ -90,8 +91,8 @@ namespace ZiggyAlloc.Tests
 
         public void Dispose()
         {
-            // Perform final cleanup
-            TestCleanup.Cleanup();
+            // Perform comprehensive final cleanup
+            TestCleanup.ComprehensiveCleanup();
 
             // Unregister event handler
             AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
@@ -99,8 +100,8 @@ namespace ZiggyAlloc.Tests
 
         private static void OnProcessExit(object sender, EventArgs e)
         {
-            // Final cleanup when process exits
-            TestCleanup.Cleanup();
+            // Comprehensive final cleanup when process exits
+            TestCleanup.ComprehensiveCleanup();
         }
     }
 }

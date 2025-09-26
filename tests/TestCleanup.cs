@@ -22,6 +22,60 @@ namespace ZiggyAlloc.Tests
         public static bool IsArm64 => RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
 
         /// <summary>
+        /// Tracks memory allocations for leak detection.
+        /// </summary>
+        private static readonly ConcurrentBag<IntPtr> _trackedAllocations = new();
+
+        /// <summary>
+        /// Registers a memory allocation for leak detection.
+        /// </summary>
+        public static void RegisterAllocation(IntPtr pointer)
+        {
+            if (pointer != IntPtr.Zero)
+            {
+                _trackedAllocations.Add(pointer);
+            }
+        }
+
+        /// <summary>
+        /// Unregisters a memory allocation.
+        /// </summary>
+        public static void UnregisterAllocation(IntPtr pointer)
+        {
+            // Remove from tracked allocations (this is a simple implementation)
+            var toRemove = _trackedAllocations.Where(p => p == pointer).ToList();
+            foreach (var ptr in toRemove)
+            {
+                _trackedAllocations.TryTake(out _);
+            }
+        }
+
+        /// <summary>
+        /// Performs comprehensive cleanup including memory leak detection.
+        /// </summary>
+        public static void ComprehensiveCleanup()
+        {
+            var initialCount = _trackedAllocations.Count;
+
+            // Perform standard cleanup
+            Cleanup();
+
+            // Check for memory leaks
+            var remainingCount = _trackedAllocations.Count;
+            if (remainingCount > 0)
+            {
+                #if DEBUG
+                System.Diagnostics.Debug.WriteLine($"Warning: {remainingCount} memory allocations may not have been freed properly.");
+                #endif
+            }
+
+            // Force garbage collection to help with cleanup
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+
+        /// <summary>
         /// Registers a disposable object for cleanup during test teardown.
         /// </summary>
         public static void Register(IDisposable disposable)
