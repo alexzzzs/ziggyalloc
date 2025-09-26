@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <!-- Reduce parallelism on ARM64 to prevent memory issues -->
+    <MaxCpuCount>2</MaxCpuCount>
+    <!-- Increase test timeout for ARM64 -->
+    <TestSessionTimeout>600000</TestSessionTimeout>
+  </RunConfiguration>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="blame" enabled="True">
+        <Configuration>
+          <CollectDumpOnTestSessionHang enabled="true" dumpType="mini" />
+          <HangDumpType>Mini</HangDumpType>
+          <HangTimeout>30000</HangTimeout>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using ZiggyAlloc;
@@ -14,6 +15,11 @@ namespace ZiggyAlloc.Tests
     {
         private static readonly ConcurrentBag<WeakReference<IDisposable>> _disposables = new();
         private static int _cleanupInProgress = 0;
+
+        /// <summary>
+        /// Gets a value indicating whether the current platform is ARM64.
+        /// </summary>
+        public static bool IsArm64 => RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
 
         /// <summary>
         /// Registers a disposable object for cleanup during test teardown.
@@ -50,20 +56,41 @@ namespace ZiggyAlloc.Tests
                 }
 
                 // Dispose all collected disposables safely
-                Parallel.ForEach(disposables, disposable =>
+                // Use sequential disposal on ARM64 to avoid potential concurrency issues
+                if (IsArm64)
                 {
-                    try
+                    foreach (var disposable in disposables)
                     {
-                        disposable.Dispose();
+                        try
+                        {
+                            disposable.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log but don't throw - we want to continue cleanup
+                            #if DEBUG
+                            System.Diagnostics.Debug.WriteLine($"Exception during test cleanup on ARM64: {ex}");
+                            #endif
+                        }
                     }
-                    catch (Exception ex)
+                }
+                else
+                {
+                    Parallel.ForEach(disposables, disposable =>
                     {
-                        // Log but don't throw - we want to continue cleanup
-                        #if DEBUG
-                        System.Diagnostics.Debug.WriteLine($"Exception during test cleanup: {ex}");
-                        #endif
-                    }
-                });
+                        try
+                        {
+                            disposable.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log but don't throw - we want to continue cleanup
+                            #if DEBUG
+                            System.Diagnostics.Debug.WriteLine($"Exception during test cleanup: {ex}");
+                            #endif
+                        }
+                    });
+                }
 
                 // Clear the collection
                 _disposables.Clear();
