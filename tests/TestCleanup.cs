@@ -69,6 +69,9 @@ namespace ZiggyAlloc.Tests
                 #endif
             }
 
+            // Clear tracked allocations
+            _trackedAllocations.Clear();
+
             // Force garbage collection to help with cleanup
             GC.Collect();
             GC.WaitForPendingFinalizers();

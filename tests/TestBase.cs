@@ -98,7 +98,7 @@ namespace ZiggyAlloc.Tests
             AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
         }
 
-        private static void OnProcessExit(object sender, EventArgs e)
+        private static void OnProcessExit(object? sender, EventArgs e)
         {
             // Comprehensive final cleanup when process exits
             TestCleanup.ComprehensiveCleanup();
