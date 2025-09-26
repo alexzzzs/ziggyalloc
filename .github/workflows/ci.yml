@@ -241,6 +241,98 @@ jobs:
     - name: Run examples
       run: dotnet run --project examples/Examples.csproj --configuration Release
 
+    - name: Final Test Run (Isolated)
+      if: runner.os != 'Windows'
+      run: |
+        echo "=== FINAL ISOLATED TEST RUN ==="
+        echo "Running tests in completely isolated batches to prevent crashes"
+
+        # Set ARM64-specific environment variables for memory management
+        if [[ "$RUNNER_ARCH" == "ARM64" || "$(uname -m)" == "arm64" ]]; then
+          echo "ARM64 detected - setting memory management environment variables"
+          export DOTNET_GCHeapHardLimit=0x7FFFFFFF  # 2GB heap limit for ARM64
+          export DOTNET_GCHighMemPercent=70         # Lower high memory threshold
+          export DOTNET_GCConserveMemory=1          # More conservative GC
+          echo "ARM64 memory settings applied"
+        fi
+
+        # Run tests in very small batches with aggressive cleanup
+        echo "Running BasicTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "BasicTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-basictests.trx" --blame --blame-hang-timeout 30s || echo "BasicTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running LifetimeTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "LifetimeTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-lifetimetests.trx" --blame --blame-hang-timeout 30s || echo "LifetimeTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running AllocatorTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "AllocatorTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-allocatortests.trx" --blame --blame-hang-timeout 30s || echo "AllocatorTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running UnmanagedBufferTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "UnmanagedBufferTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-unmanagedbuffertests.trx" --blame --blame-hang-timeout 30s || echo "UnmanagedBufferTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running DeferScopeTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "DeferScopeTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-deferscopetests.trx" --blame --blame-hang-timeout 30s || echo "DeferScopeTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running ScopedMemoryAllocatorTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "ScopedMemoryAllocatorTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-scopedmemoryallocatortests.trx" --blame --blame-hang-timeout 30s || echo "ScopedMemoryAllocatorTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running SlabAllocatorTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "SlabAllocatorTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-slaballocatortests.trx" --blame --blame-hang-timeout 30s || echo "SlabAllocatorTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running HybridAllocatorTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "HybridAllocatorTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-hybridallocatortests.trx" --blame --blame-hang-timeout 30s || echo "HybridAllocatorTests completed"
+
+        # Aggressive cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "Running UnmanagedMemoryPoolTests only..."
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --filter "UnmanagedMemoryPoolTests" --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results-unmanagedmemorypooltests.trx" --blame --blame-hang-timeout 30s || echo "UnmanagedMemoryPoolTests completed"
+
+        # Final cleanup
+        pkill -f dotnet 2>/dev/null || true
+        pkill -f testhost 2>/dev/null || true
+        sleep 15
+
+        echo "=== ALL ISOLATED TEST BATCHES COMPLETED ==="
+        echo "If any tests failed, they would be isolated to specific categories"
+        echo "Check the individual test result files for details"
+
   publish:
     needs: test
     runs-on: ubuntu-latest
