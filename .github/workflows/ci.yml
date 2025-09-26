@@ -35,9 +35,15 @@ jobs:
         echo "uname -m: $(uname -m)"
         echo "uname -p: $(uname -p)"
 
-        # Run tests - DebugMemoryAllocator tests have been removed to prevent crashes
+        # Run tests with improved error handling and cleanup
         echo "Running stable test suite"
-        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj
+        dotnet test --no-build --configuration Release --verbosity normal tests/ZiggyAlloc.Tests.csproj --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results.trx" || {
+          echo "Tests completed with potential issues - checking results..."
+          if [ -f "tests/TestResults/test-results.trx" ]; then
+            echo "Test results file exists - checking for failures..."
+          fi
+          exit 1
+        }
 
     - name: Test Debug Tests (Allow Failures)
       run: |

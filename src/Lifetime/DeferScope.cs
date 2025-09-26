@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace ZiggyAlloc
 {
@@ -9,7 +10,7 @@ namespace ZiggyAlloc
     public sealed class DeferScope : IDisposable
     {
         private readonly Stack<Action> _deferredActions = new();
-        private bool _disposed = false;
+        private int _disposed = 0; // Use int for atomic operations instead of bool
 
         /// <summary>
         /// Starts a new defer scope.
@@ -23,9 +24,12 @@ namespace ZiggyAlloc
         {
             if (action == null)
                 throw new ArgumentNullException(nameof(action));
-            
+
             ThrowIfDisposed();
-            _deferredActions.Push(action);
+            lock (_deferredActions)
+            {
+                _deferredActions.Push(action);
+            }
         }
 
         /// <summary>
@@ -36,7 +40,10 @@ namespace ZiggyAlloc
             get
             {
                 ThrowIfDisposed();
-                return _deferredActions.Count;
+                lock (_deferredActions)
+                {
+                    return _deferredActions.Count;
+                }
             }
         }
 
@@ -45,17 +52,28 @@ namespace ZiggyAlloc
         /// </summary>
         public void Dispose()
         {
-            if (_disposed)
+            // Use atomic operation to check and set disposed state
+            if (Interlocked.Exchange(ref _disposed, 1) == 1)
                 return;
 
             List<Exception>? exceptions = null;
+            var actions = new List<Action>();
 
-            // Execute all deferred actions in reverse order
-            while (_deferredActions.Count > 0)
+            // Atomically get all actions to execute (prevents race conditions)
+            lock (_deferredActions)
+            {
+                while (_deferredActions.Count > 0)
+                {
+                    actions.Add(_deferredActions.Pop());
+                }
+            }
+
+            // Execute all deferred actions in reverse order (outside lock for performance)
+            for (int i = actions.Count - 1; i >= 0; i--)
             {
                 try
                 {
-                    _deferredActions.Pop().Invoke();
+                    actions[i].Invoke();
                 }
                 catch (Exception ex)
                 {
@@ -64,8 +82,6 @@ namespace ZiggyAlloc
                     exceptions.Add(ex);
                 }
             }
-
-            _disposed = true;
 
             // Throw all exceptions if any occurred
             if (exceptions != null)
@@ -79,7 +95,7 @@ namespace ZiggyAlloc
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
+            if (_disposed == 1)
                 throw new ObjectDisposedException(nameof(DeferScope));
         }
     }
