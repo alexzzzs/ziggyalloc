@@ -26,10 +26,13 @@ $AllBenchmarks = @(
     "DataTypeBenchmarks",
     "ExperimentalOptimizationsBenchmarks",
     "HybridAllocatorBenchmarks",
+    "LargeArrayOptimizationBenchmarks",
     "MultithreadingBenchmarks",
     "PoolingBenchmarks",
     "RealWorldScenarioBenchmarks",
-    "SlabAllocatorBenchmarks"
+    "SimdPerformanceBenchmarks",
+    "SlabAllocatorBenchmarks",
+    "ThreadLocalMemoryPoolBenchmarks"
 )
 
 # Benchmark configurations for different modes
@@ -40,6 +43,11 @@ $BenchmarkModes = @{
     "specific" = @($Filter)
     "performance" = @("AllocationBenchmarks", "MultithreadingBenchmarks", "PoolingBenchmarks")
     "comparison" = @("AllocatorComparisonBenchmarks", "DataTypeBenchmarks")
+    "threading" = @("MultithreadingBenchmarks", "ThreadLocalMemoryPoolBenchmarks")
+    "memory" = @("PoolingBenchmarks", "SlabAllocatorBenchmarks", "HybridAllocatorBenchmarks")
+    "optimization" = @("SimdPerformanceBenchmarks", "LargeArrayOptimizationBenchmarks")
+    "allocators" = @("AllocatorBenchmarks", "AllocatorComparisonBenchmarks", "HybridAllocatorBenchmarks", "SlabAllocatorBenchmarks")
+    "interactive" = @()  # Special mode for interactive selection
 }
 
 # Display header
@@ -74,11 +82,57 @@ if (-not $BenchmarkModes.ContainsKey($Mode)) {
     exit 1
 }
 
-# Get benchmarks to run
-$BenchmarksToRun = $BenchmarkModes[$Mode]
-if ($Mode -eq "specific" -and $Filter -eq "") {
-    Write-Host "Error: Filter parameter required when using 'specific' mode" -ForegroundColor Red
-    exit 1
+# Interactive mode implementation
+if ($Mode -eq "interactive") {
+    Write-Host "Interactive Benchmark Selection Mode" -ForegroundColor Cyan
+    Write-Host "===================================" -ForegroundColor Cyan
+    Write-Host ""
+
+    # Display available categories
+    Write-Host "Available benchmark categories:" -ForegroundColor Yellow
+    $categories = @{
+        "1" = @("AllocationBenchmarks", "AllocatorBenchmarks")
+        "2" = @("MultithreadingBenchmarks", "ThreadLocalMemoryPoolBenchmarks")
+        "3" = @("PoolingBenchmarks", "SlabAllocatorBenchmarks", "HybridAllocatorBenchmarks")
+        "4" = @("SimdPerformanceBenchmarks", "LargeArrayOptimizationBenchmarks")
+        "5" = @("AllocatorComparisonBenchmarks", "DataTypeBenchmarks")
+        "6" = @("ExperimentalOptimizationsBenchmarks", "RealWorldScenarioBenchmarks")
+    }
+
+    for ($i = 1; $i -le 6; $i++) {
+        $categoryBenchmarks = $categories[$i.ToString()]
+        Write-Host "  $i. $($categoryBenchmarks -join ', ')" -ForegroundColor White
+    }
+
+    Write-Host ""
+    $selectedCategories = Read-Host "Enter category numbers to run (e.g., '1,3,5' for multiple categories, or 'all' for all benchmarks)"
+
+    if ($selectedCategories -eq "all") {
+        $BenchmarksToRun = $AllBenchmarks
+    } else {
+        $BenchmarksToRun = @()
+        $categoryNumbers = $selectedCategories.Split(',') | ForEach-Object { $_.Trim() }
+
+        foreach ($categoryNum in $categoryNumbers) {
+            if ($categories.ContainsKey($categoryNum)) {
+                $BenchmarksToRun += $categories[$categoryNum]
+            } else {
+                Write-Host "Warning: Invalid category number '$categoryNum' ignored" -ForegroundColor Yellow
+            }
+        }
+
+        if ($BenchmarksToRun.Count -eq 0) {
+            Write-Host "No valid categories selected. Exiting." -ForegroundColor Red
+            exit 1
+        }
+    }
+} else {
+    # Get benchmarks to run
+    $BenchmarksToRun = $BenchmarkModes[$Mode]
+    if ($Mode -eq "specific" -and $Filter -eq "") {
+        Write-Host "Error: Filter parameter required when using 'specific' mode" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Create output directory if saving results
@@ -185,11 +239,14 @@ Write-Host "Total script execution time: $($totalTime.TotalMinutes.ToString("F2"
 # Display usage examples
 Write-Host ""
 Write-Host "Usage Examples:" -ForegroundColor Magenta
-Write-Host "  .\run-benchmarks.ps1                    # Run all benchmarks" -ForegroundColor White
-Write-Host "  .\run-benchmarks.ps1 -Mode quick        # Run quick benchmarks only" -ForegroundColor White
-Write-Host "  .\run-benchmarks.ps1 -Mode experimental # Run experimental benchmarks" -ForegroundColor White
+Write-Host "  .\run-benchmarks.ps1                           # Run all benchmarks" -ForegroundColor White
+Write-Host "  .\run-benchmarks.ps1 -Mode quick               # Run quick benchmarks only" -ForegroundColor White
+Write-Host "  .\run-benchmarks.ps1 -Mode experimental        # Run experimental benchmarks" -ForegroundColor White
+Write-Host "  .\run-benchmarks.ps1 -Mode threading           # Run threading-related benchmarks" -ForegroundColor White
+Write-Host "  .\run-benchmarks.ps1 -Mode memory              # Run memory-related benchmarks" -ForegroundColor White
+Write-Host "  .\run-benchmarks.ps1 -Mode interactive         # Interactive benchmark selection" -ForegroundColor White
 Write-Host "  .\run-benchmarks.ps1 -Mode specific -Filter AllocationBenchmarks" -ForegroundColor White
-Write-Host "  .\run-benchmarks.ps1 -Parallel -SaveResults" -ForegroundColor White
+Write-Host "  .\run-benchmarks.ps1 -Parallel -SaveResults   # Run in parallel and save results" -ForegroundColor White
 Write-Host "  .\run-benchmarks.ps1 -Verbose -Configuration Release" -ForegroundColor White
 
 exit $exitCode

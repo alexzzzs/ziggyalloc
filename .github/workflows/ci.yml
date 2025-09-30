@@ -84,6 +84,7 @@ jobs:
     - name: Test (Unix)
       if: runner.os != 'Windows'
       run: |
+        echo "=== RELEASE WORKFLOW - NO TESTS ==="
         echo "Runner architecture: $RUNNER_ARCH"
         echo "uname -m: $(uname -m)"
         echo "uname -p: $(uname -p)"
@@ -97,10 +98,12 @@ jobs:
           echo "ARM64 memory settings applied"
         fi
 
-        # Skip tests for release workflow - they cause crashes due to memory leak detection
-        echo "Skipping tests for release workflow to avoid DebugMemoryAllocator crashes"
-        echo "Tests will be run separately in CI pipeline"
-        echo "Test run skipped - proceeding with build"
+        # CRITICAL: Skip ALL tests for release workflow - they cause crashes due to memory leak detection
+        echo "🚫 SKIPPING ALL TESTS FOR RELEASE WORKFLOW"
+        echo "🚫 DebugMemoryAllocator crashes test host when memory leaks are detected"
+        echo "🚫 Tests will be run separately in regular CI pipeline"
+        echo "🚫 Test run completely skipped - proceeding with build"
+        echo "=== END RELEASE WORKFLOW TEST SKIP ==="
 
     - name: Upload Test Results
       if: always()
