@@ -60,5 +60,35 @@ namespace ZiggyAlloc
         {
             return new NumaAwareAllocator(baseAllocator);
         }
+
+        /// <summary>
+        /// Creates a new aligned allocator instance for hardware-accelerated memory operations.
+        /// </summary>
+        /// <returns>A new AlignedAllocator instance with automatic alignment strategy</returns>
+        public static AlignedAllocator CreateAlignedAllocator()
+        {
+            return new AlignedAllocator(DefaultAllocator);
+        }
+
+        /// <summary>
+        /// Creates a new aligned allocator instance with a custom base allocator.
+        /// </summary>
+        /// <param name="baseAllocator">The base allocator to use for actual memory allocation</param>
+        /// <returns>A new AlignedAllocator instance</returns>
+        public static AlignedAllocator CreateAlignedAllocator(IUnmanagedMemoryAllocator baseAllocator)
+        {
+            return new AlignedAllocator(baseAllocator);
+        }
+
+        /// <summary>
+        /// Creates a new aligned allocator instance with a specific alignment strategy.
+        /// </summary>
+        /// <param name="strategy">The alignment strategy to use</param>
+        /// <param name="customAlignment">Custom alignment size (used when strategy is Custom)</param>
+        /// <returns>A new AlignedAllocator instance</returns>
+        public static AlignedAllocator CreateAlignedAllocator(AlignmentStrategy strategy, int customAlignment = 32)
+        {
+            return new AlignedAllocator(DefaultAllocator, strategy, customAlignment);
+        }
     }
 }
