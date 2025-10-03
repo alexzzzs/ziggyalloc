@@ -41,5 +41,24 @@ namespace ZiggyAlloc
         {
             return new SystemMemoryAllocator();
         }
+
+        /// <summary>
+        /// Creates a new NUMA-aware allocator instance.
+        /// </summary>
+        /// <returns>A new NumaAwareAllocator instance</returns>
+        public static NumaAwareAllocator CreateNumaAwareAllocator()
+        {
+            return new NumaAwareAllocator(DefaultAllocator);
+        }
+
+        /// <summary>
+        /// Creates a new NUMA-aware allocator instance with a custom base allocator.
+        /// </summary>
+        /// <param name="baseAllocator">The base allocator to use for actual memory allocation</param>
+        /// <returns>A new NumaAwareAllocator instance</returns>
+        public static NumaAwareAllocator CreateNumaAwareAllocator(IUnmanagedMemoryAllocator baseAllocator)
+        {
+            return new NumaAwareAllocator(baseAllocator);
+        }
     }
 }
