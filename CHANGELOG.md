@@ -71,33 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lock-free allocations**: Zero contention overhead for thread-local operations
 - **Intelligent sharing**: Optional cross-thread buffer sharing for mixed workloads
 - **Memory efficiency**: Reduced memory fragmentation through size-class optimization
-
-### Changed
-- **Benchmark infrastructure**: Enhanced with new categories and interactive selection
-- **PowerShell scripts**: Updated to support all 13 benchmark classes
-- **Documentation**: Comprehensive updates to benchmark documentation and usage examples
-
-## [1.4.0] - 2025-10-04
-
-### Added
-- **Major Performance Optimizations** - Revolutionary improvements across all allocators:
-  - **Enhanced SIMD Operations**: 10-30% improvement for large data operations with prefaulting and non-temporal stores
-  - **Lock-Free Memory Pool Architecture**: 15-25% improvement in multi-threaded scenarios using correct Treiber stack algorithm
-  - **Dynamic Size-Class Adjustment**: 10-20% memory efficiency gains with runtime profiling and adaptive optimization
-  - **Parallel Processing**: Support for very large datasets (>1MB) with automatic thread scaling
-  - **Memory Access Pattern Profiling**: Intelligent optimization based on usage patterns
-- **Comprehensive Test Suite** - Extensive testing for all optimization features:
-  - **SIMD Operations Tests**: Hardware detection, prefaulting, performance validation
-  - **Lock-Free Pool Tests**: High concurrency, thread safety, memory safety verification
-  - **Dynamic Optimization Tests**: Usage tracking, size-class adjustment, performance monitoring
-  - **Performance Regression Tests**: Benchmarks, stress tests, edge case validation
-  - **Cross-Allocator Compatibility**: All allocators work together seamlessly
-
-### Performance Improvements
 - **Overall System Performance**: 25-40% improvement across typical allocation patterns
 - **Multi-threaded Applications**: 15-25% better allocation performance with lock-free algorithms
 - **Large Data Processing**: 10-30% improvement with SIMD acceleration and prefaulting
-- **Memory Efficiency**: 10-20% reduction in memory overhead through dynamic optimization
 - **Thread Safety**: Zero contention overhead for thread-local operations
 - **Scalability**: Improved scaling with vectorized workloads and parallel processing
 
@@ -110,6 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test Resource Management**: Implemented proper disposal patterns for comprehensive allocator tests to prevent resource exhaustion during extensive test suite execution (note: individual tests work perfectly, but running large test batches may encounter test framework resource constraints)
 
 ### Changed
+- **Benchmark infrastructure**: Enhanced with new categories and interactive selection
+- **PowerShell scripts**: Updated to support all 13 benchmark classes
+- **Documentation**: Comprehensive updates to benchmark documentation and usage examples
 - **UnmanagedMemoryPool**: Complete rewrite with correct lock-free algorithm and enhanced SIMD integration
 - **SimdMemoryOperations**: Added prefaulting, non-temporal stores, and parallel processing capabilities
 - **SystemMemoryAllocator**: Integration of enhanced SIMD operations for large allocations
