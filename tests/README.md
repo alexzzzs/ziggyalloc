@@ -9,7 +9,7 @@ Tests are organized by component:
 - `AllocatorTests.cs` - Core allocator functionality tests
 - `UnmanagedBufferTests.cs` - UnmanagedBuffer functionality tests
 - `ScopedMemoryAllocatorTests.cs` - Scoped allocator specific tests
-- `DebugMemoryAllocatorTests.cs` - Debug allocator specific tests
+- `DebugAllocatorTests.cs` - Debug allocator specific tests
 - `UnmanagedMemoryPoolTests.cs` - Memory pool specific tests
 - `HybridAllocatorTests.cs` - Hybrid allocator specific tests
 - `SlabAllocatorTests.cs` - Slab allocator specific tests (new)

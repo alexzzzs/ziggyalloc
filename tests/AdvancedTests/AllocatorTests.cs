@@ -50,9 +50,9 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_AutomaticallyFreesAllAllocations()
+        public void ScopedAllocator_AutomaticallyFreesAllAllocations()
         {
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
             
             using var buffer1 = allocator.Allocate<int>(1);
             using var buffer2 = allocator.Allocate<double>(5);
@@ -70,9 +70,9 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_DoesNotSupportIndividualDeallocation()
+        public void ScopedAllocator_DoesNotSupportIndividualDeallocation()
         {
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
             Assert.False(allocator.SupportsIndividualDeallocation);
             
             Assert.Throws<NotSupportedException>(() => allocator.Free(IntPtr.Zero));

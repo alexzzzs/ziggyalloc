@@ -18,10 +18,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_CanBeCreated()
+        public void ScopedAllocator_CanBeCreated()
         {
             // Arrange & Act
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Assert
             Assert.NotNull(allocator);

@@ -52,16 +52,16 @@ namespace ZiggyAlloc
         private bool _disposed = false;
 
         // Windows NUMA API imports
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern int GetCurrentProcessorNumber();
 
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool GetNumaProcessorNode(int processorId, out int nodeNumber);
 
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern int GetNumaNodeProcessorMask(int node, IntPtr processorMask);
 
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool VirtualAllocExNuma(IntPtr hProcess, IntPtr lpAddress,
             uint dwSize, uint flAllocationType, uint flProtect, int nndPreferred);
 
@@ -223,6 +223,7 @@ namespace ZiggyAlloc
             return 0;
         }
 
+        /// <summary>
         /// Gets the NUMA node for the current thread (static version for use by nested classes).
         /// </summary>
         private static int GetCurrentThreadNodeStatic()
@@ -247,33 +248,80 @@ namespace ZiggyAlloc
 
             try
             {
-                // Try to detect NUMA nodes by checking processor mask for each potential node
-                for (int i = 0; i < 64; i++) // Reasonable upper limit
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    var maskPtr = Marshal.AllocHGlobal(sizeof(ulong));
-                    try
-                    {
-                        int size = GetNumaNodeProcessorMask(i, maskPtr);
-                        if (size > 0)
-                        {
-                            nodeCount = i + 1;
-                        }
-                        else
-                        {
-                            break; // No more nodes
-                        }
-                    }
-                    finally
-                    {
-                        Marshal.FreeHGlobal(maskPtr);
-                    }
+                    return DetectNumaSupportWindows(out nodeCount);
                 }
-
-                return nodeCount > 1;
+                else
+                {
+                    return DetectNumaSupportCrossPlatform(out nodeCount);
+                }
             }
             catch
             {
                 // NUMA detection failed, assume single node
+                nodeCount = 1;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Windows-specific NUMA detection.
+        /// </summary>
+        private static bool DetectNumaSupportWindows(out int nodeCount)
+        {
+            nodeCount = 1; // Default to 1 node
+
+            // Try to detect NUMA nodes by checking processor mask for each potential node
+            for (int i = 0; i < 64; i++) // Reasonable upper limit
+            {
+                var maskPtr = Marshal.AllocHGlobal(sizeof(ulong));
+                try
+                {
+                    int size = GetNumaNodeProcessorMask(i, maskPtr);
+                    if (size > 0)
+                    {
+                        nodeCount = i + 1;
+                    }
+                    else
+                    {
+                        break; // No more nodes
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(maskPtr);
+                }
+            }
+
+            return nodeCount > 1;
+        }
+
+        /// <summary>
+        /// Cross-platform NUMA detection using available system information.
+        /// </summary>
+        private static bool DetectNumaSupportCrossPlatform(out int nodeCount)
+        {
+            nodeCount = 1; // Default to 1 node
+
+            try
+            {
+                // On Linux/Unix systems, we can try to read /proc/cpuinfo or use sysconf
+                // For now, use a simple heuristic based on processor count
+                int processorCount = Environment.ProcessorCount;
+
+                // Assume NUMA if we have many processors (this is a heuristic)
+                if (processorCount >= 16)
+                {
+                    // Estimate nodes based on processor count (rough heuristic)
+                    nodeCount = Math.Max(1, processorCount / 8);
+                    return true;
+                }
+
+                return false;
+            }
+            catch
+            {
                 nodeCount = 1;
                 return false;
             }

@@ -15,7 +15,7 @@ namespace ZiggyAlloc
     /// 
     /// This allocator is NOT thread-safe. Use separate instances for different threads.
     /// </remarks>
-    public sealed class ScopedMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
+    public sealed class ScopedAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
         private readonly SystemMemoryAllocator _backingAllocator = new();
         private readonly List<IntPtr> _allocatedPointers = new();
@@ -95,7 +95,7 @@ namespace ZiggyAlloc
         {
             ThrowIfDisposed();
             throw new NotSupportedException(
-                "Individual memory deallocation is not supported in ScopedMemoryAllocator. " +
+                "Individual memory deallocation is not supported in ScopedAllocator. " +
                 "All memory is automatically freed when the allocator is disposed.");
         }
 
@@ -127,9 +127,10 @@ namespace ZiggyAlloc
                     {
                         // Log exception in debug builds instead of silently ignoring
                         #if DEBUG
-                        System.Diagnostics.Debug.WriteLine($"Exception during cleanup in ScopedMemoryAllocator.Dispose: {ex}");
+                        System.Diagnostics.Debug.WriteLine($"Exception during cleanup in ScopedAllocator.Dispose: {ex}");
                         #endif
                         throw; // Re-throw to maintain original behavior for compatibility
+                        // ex parameter is used for debugging above
                     }
                 }
 
@@ -143,7 +144,7 @@ namespace ZiggyAlloc
         private void ThrowIfDisposed()
         {
             if (Volatile.Read(ref _disposed))
-                throw new ObjectDisposedException(nameof(ScopedMemoryAllocator));
+                throw new ObjectDisposedException(nameof(ScopedAllocator));
         }
     }
 }

@@ -98,8 +98,8 @@ public interface IUnmanagedMemoryAllocator
 ### Available Allocators
 
 1. **SystemMemoryAllocator** - Direct system memory allocation
-2. **ScopedMemoryAllocator** - Arena-style allocator that frees all memory when disposed
-3. **DebugMemoryAllocator** - Tracks allocations and detects memory leaks with caller information
+2. **ScopedAllocator** - Arena-style allocator that frees all memory when disposed
+3. **DebugAllocator** - Tracks allocations and detects memory leaks with caller information
 4. **UnmanagedMemoryPool** - Reduces allocation overhead by reusing previously allocated buffers
 5. **HybridAllocator** - Automatically chooses between managed and unmanaged allocation based on size and type
 6. **SlabAllocator** - Pre-allocates large blocks and sub-allocates for high-frequency small allocations
@@ -191,7 +191,7 @@ Console.WriteLine($"Allocated: {allocator.TotalAllocatedBytes} bytes");
 
 ### Memory Leak Detection
 ```csharp
-using var debug = new DebugMemoryAllocator("Test", Z.DefaultAllocator, 
+using var debug = new DebugAllocator("Test", Z.DefaultAllocator,
     MemoryLeakReportingMode.Throw);
 
 using var buffer1 = debug.Allocate<int>(10); // Properly disposed
@@ -202,7 +202,7 @@ var buffer2 = debug.Allocate<int>(5);
 
 ### Scoped Memory Management
 ```csharp
-using var scopedAllocator = new ScopedMemoryAllocator();
+using var scopedAllocator = new ScopedAllocator();
 
 // Multiple allocations that will all be freed together
 using var buffer1 = scopedAllocator.Allocate<int>(100);
@@ -216,8 +216,8 @@ using var buffer3 = scopedAllocator.Allocate<byte>(1000);
 
 1. **Use appropriate allocators**: 
    - `SystemMemoryAllocator` for general use
-   - `ScopedMemoryAllocator` for temporary allocations
-   - `DebugMemoryAllocator` during development
+   - `ScopedAllocator` for temporary allocations
+   - `DebugAllocator` during development
 2. **Always use `using` statements**: Ensures deterministic cleanup
 3. **Leverage Span<T> conversion**: Get high performance without copying
 4. **Check for leaks**: Use `DebugMemoryAllocator` during development

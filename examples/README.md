@@ -99,10 +99,10 @@ using var largeBuffer = hybridAllocator.Allocate<int>(10000);
 #### SystemMemoryAllocator
 Direct system memory allocation
 
-#### ScopedMemoryAllocator
+#### ScopedAllocator
 Arena-style allocation with automatic cleanup
 
-#### DebugMemoryAllocator
+#### DebugAllocator
 Leak detection and debugging
 
 #### UnmanagedMemoryPool

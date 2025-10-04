@@ -22,6 +22,9 @@ namespace ZiggyAlloc.Benchmarks
         private AlignedAllocator? _alignedAllocator;
         private UnmanagedMemoryPool? _memoryPool;
 
+        private const int CacheLineSize = 64;
+        private const int CacheLineIterations = 100;
+
         [GlobalSetup]
         public void Setup()
         {
@@ -250,7 +253,7 @@ namespace ZiggyAlloc.Benchmarks
 
         [Benchmark(Description = "Bulk Memory Operations - Unaligned")]
         [BenchmarkCategory("BulkOperations")]
-        public void UnalignedBulkMemoryOperations()
+        public unsafe void UnalignedBulkMemoryOperations()
         {
             for (int i = 0; i < 50; i++)
             {
@@ -279,7 +282,7 @@ namespace ZiggyAlloc.Benchmarks
 
         [Benchmark(Description = "Bulk Memory Operations - Aligned")]
         [BenchmarkCategory("BulkOperations")]
-        public void AlignedBulkMemoryOperations()
+        public unsafe void AlignedBulkMemoryOperations()
         {
             for (int i = 0; i < 50; i++)
             {
@@ -365,35 +368,38 @@ namespace ZiggyAlloc.Benchmarks
             }
         }
 
-        [Benchmark(Description = "Cache Line Aligned vs Unaligned")]
+        [Benchmark(Description = "Cache Line Unaligned")]
         [BenchmarkCategory("CacheAlignment")]
-        public void CacheLineAlignedVsUnaligned()
+        public void CacheLineUnaligned()
         {
-            const int cacheLineSize = 64;
-            const int iterations = 100;
-
             // Unaligned allocator
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < CacheLineIterations; i++)
             {
-                using var unaligned = _systemAllocator!.Allocate<byte>(cacheLineSize);
+                using var unaligned = _systemAllocator!.Allocate<byte>(CacheLineSize);
                 // Access in cache-line sized chunks
-                for (int j = 0; j < unaligned.Length; j += cacheLineSize)
+                for (int j = 0; j < unaligned.Length; j += CacheLineSize)
                 {
                     unaligned[j] = (byte)i;
                 }
             }
+        }
 
+        [Benchmark(Description = "Cache Line Aligned")]
+        [BenchmarkCategory("CacheAlignment")]
+        public void CacheLineAligned()
+        {
             // Aligned allocator
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < CacheLineIterations; i++)
             {
-                using var aligned = _alignedAllocator!.Allocate<byte>(cacheLineSize);
+                using var aligned = _alignedAllocator!.Allocate<byte>(CacheLineSize);
                 // Access in cache-line sized chunks
-                for (int j = 0; j < aligned.Length; j += cacheLineSize)
+                for (int j = 0; j < aligned.Length; j += CacheLineSize)
                 {
                     aligned[j] = (byte)i;
                 }
             }
         }
+
 
         [Benchmark(Description = "Memory Pool vs Aligned Allocator")]
         [BenchmarkCategory("Comparison")]

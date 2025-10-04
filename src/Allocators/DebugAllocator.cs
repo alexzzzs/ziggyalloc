@@ -31,7 +31,7 @@ namespace ZiggyAlloc
     /// This allocator is thread-safe and can be used from multiple threads simultaneously.
     /// The caller information (file, line, method) is captured automatically using compiler services.
     /// </remarks>
-    public sealed class DebugMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
+    public sealed class DebugAllocator : IUnmanagedMemoryAllocator, IDisposable
     {
         /// <summary>
         /// Metadata about a memory allocation for leak tracking.
@@ -81,7 +81,7 @@ namespace ZiggyAlloc
         /// <param name="reportingMode">How to report memory leaks when detected</param>
         /// <exception cref="ArgumentNullException">Thrown when name or backingAllocator is null</exception>
         /// <exception cref="ArgumentException">Thrown when name is empty or whitespace</exception>
-        public DebugMemoryAllocator(string name, IUnmanagedMemoryAllocator backingAllocator, 
+        public DebugAllocator(string name, IUnmanagedMemoryAllocator backingAllocator,
             MemoryLeakReportingMode reportingMode = MemoryLeakReportingMode.Log)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -181,8 +181,8 @@ namespace ZiggyAlloc
 
                 if (!wasTracked)
                 {
-                    Debug.WriteLine($"[DebugMemoryAllocator '{_allocatorName}'] Warning: " +
-                                  $"Attempted to free untracked pointer 0x{pointer.ToString("X")}");
+                    Debug.WriteLine($"[DebugAllocator '{_allocatorName}'] Warning: " +
+                                   $"Attempted to free untracked pointer 0x{pointer.ToString("X")}");
                 }
 
                 _backingAllocator.Free(pointer);
@@ -191,9 +191,10 @@ namespace ZiggyAlloc
             {
                 // Log exception in debug builds instead of silently ignoring
                 #if DEBUG
-                System.Diagnostics.Debug.WriteLine($"Exception during memory cleanup in DebugMemoryAllocator.Free: {ex}");
+                System.Diagnostics.Debug.WriteLine($"Exception during memory cleanup in DebugAllocator.Free: {ex}");
                 #endif
                 throw; // Re-throw to maintain original behavior for compatibility
+                // ex parameter is used for debugging above
             }
         }
 
@@ -253,7 +254,7 @@ namespace ZiggyAlloc
             }
 
             var reportBuilder = new StringBuilder()
-                .AppendLine($"!!! MEMORY LEAK DETECTED in DebugMemoryAllocator '{_allocatorName}' !!!")
+                .AppendLine($"!!! MEMORY LEAK DETECTED in DebugAllocator '{_allocatorName}' !!!")
                 .AppendLine($"Found {leakedAllocations.Count} unfreed allocation(s):")
                 .AppendLine();
 
@@ -309,7 +310,7 @@ namespace ZiggyAlloc
         {
             // Use Volatile.Read to ensure we're reading the most up-to-date value
             if (Volatile.Read(ref _disposed))
-                throw new ObjectDisposedException(nameof(DebugMemoryAllocator));
+                throw new ObjectDisposedException(nameof(DebugAllocator));
         }
     }
 }

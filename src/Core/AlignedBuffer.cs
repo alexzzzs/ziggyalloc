@@ -15,7 +15,7 @@ namespace ZiggyAlloc
     {
         private readonly T* _alignedPointer;
         private readonly int _length;
-        private readonly IUnmanagedMemoryAllocator _allocator;
+        private readonly IUnmanagedMemoryAllocator? _allocator;
         private readonly IntPtr _basePointer;
         private readonly int _paddingBytes;
 
@@ -99,7 +99,7 @@ namespace ZiggyAlloc
         /// <param name="allocator">The allocator that owns this buffer</param>
         /// <param name="basePointer">The original unaligned pointer for cleanup</param>
         /// <param name="paddingBytes">The number of padding bytes used for alignment</param>
-        internal AlignedBuffer(T* alignedPointer, int length, IUnmanagedMemoryAllocator allocator,
+        internal AlignedBuffer(T* alignedPointer, int length, IUnmanagedMemoryAllocator? allocator,
                               IntPtr basePointer, int paddingBytes)
         {
             _alignedPointer = alignedPointer;
@@ -124,7 +124,7 @@ namespace ZiggyAlloc
         public static AlignedBuffer<T> Create(UnmanagedBuffer<T> baseBuffer, int alignment)
         {
             if (!baseBuffer.IsValid)
-                return new AlignedBuffer<T>(null, 0, null, IntPtr.Zero, 0);
+                return new AlignedBuffer<T>((T*)null, 0, null, IntPtr.Zero, 0);
 
             var baseAddress = (byte*)baseBuffer.RawPointer.ToPointer();
             var alignedAddress = (byte*)AlignPointer(baseAddress, alignment);
@@ -152,7 +152,7 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts the aligned buffer to a Span<T>.
+        /// Converts the aligned buffer to a Span&lt;T&gt;.
         /// </summary>
         /// <returns>A span representing the aligned buffer data</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -162,7 +162,7 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Converts the aligned buffer to a ReadOnlySpan<T>.
+        /// Converts the aligned buffer to a ReadOnlySpan&lt;T&gt;.
         /// </summary>
         /// <returns>A readonly span representing the aligned buffer data</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -223,7 +223,7 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Implicit conversion to Span<T> for zero-cost interoperability.
+        /// Implicit conversion to Span&lt;T&gt; for zero-cost interoperability.
         /// </summary>
         /// <param name="buffer">The aligned buffer to convert</param>
         /// <returns>A span representing the aligned buffer data</returns>
@@ -234,7 +234,7 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Implicit conversion to ReadOnlySpan<T> for zero-cost interoperability.
+        /// Implicit conversion to ReadOnlySpan&lt;T&gt; for zero-cost interoperability.
         /// </summary>
         /// <param name="buffer">The aligned buffer to convert</param>
         /// <returns>A readonly span representing the aligned buffer data</returns>
@@ -249,7 +249,7 @@ namespace ZiggyAlloc
         /// </summary>
         public void Dispose()
         {
-            if (_basePointer != IntPtr.Zero && _allocator != null)
+            if (_basePointer != IntPtr.Zero && _allocator is not null)
             {
                 _allocator.Free(_basePointer);
             }

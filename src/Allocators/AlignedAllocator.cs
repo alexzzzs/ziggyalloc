@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Threading;
+using System.Numerics;
 
 namespace ZiggyAlloc
 {
@@ -135,11 +136,11 @@ namespace ZiggyAlloc
         private long _totalPaddingBytes;
         private bool _disposed = false;
 
-        // CPU detection imports
-        [DllImport("kernel32.dll")]
+        // CPU detection imports (Windows-specific)
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern void GetSystemInfo(out SYSTEM_INFO lpSystemInfo);
 
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool IsProcessorFeaturePresent(ProcessorFeature processorFeature);
 
         private enum ProcessorFeature : uint
@@ -400,34 +401,43 @@ namespace ZiggyAlloc
 
             try
             {
-                // Check for SSE
-                if (IsProcessorFeaturePresent(ProcessorFeature.PF_XMMI_INSTRUCTIONS_AVAILABLE))
+                // Try Windows-specific detection first
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    architecture |= CpuArchitecture.SSE;
-                }
+                    // Check for SSE
+                    if (IsProcessorFeaturePresent(ProcessorFeature.PF_XMMI_INSTRUCTIONS_AVAILABLE))
+                    {
+                        architecture |= CpuArchitecture.SSE;
+                    }
 
-                // Check for SSE2
-                if (IsProcessorFeaturePresent(ProcessorFeature.PF_XMMI64_INSTRUCTIONS_AVAILABLE))
-                {
-                    architecture |= CpuArchitecture.SSE2;
-                }
+                    // Check for SSE2
+                    if (IsProcessorFeaturePresent(ProcessorFeature.PF_XMMI64_INSTRUCTIONS_AVAILABLE))
+                    {
+                        architecture |= CpuArchitecture.SSE2;
+                    }
 
-                // Check for AVX
-                if (IsProcessorFeaturePresent(ProcessorFeature.PF_AVX_INSTRUCTIONS_AVAILABLE))
-                {
-                    architecture |= CpuArchitecture.AVX;
-                }
+                    // Check for AVX
+                    if (IsProcessorFeaturePresent(ProcessorFeature.PF_AVX_INSTRUCTIONS_AVAILABLE))
+                    {
+                        architecture |= CpuArchitecture.AVX;
+                    }
 
-                // Check for AVX2 (not directly available, infer from AVX presence)
-                if ((architecture & CpuArchitecture.AVX) != 0)
-                {
-                    architecture |= CpuArchitecture.AVX2;
-                }
+                    // Check for AVX2 (not directly available, infer from AVX presence)
+                    if ((architecture & CpuArchitecture.AVX) != 0)
+                    {
+                        architecture |= CpuArchitecture.AVX2;
+                    }
 
-                // Check for AVX-512
-                if (IsProcessorFeaturePresent(ProcessorFeature.PF_AVX512_INSTRUCTIONS_AVAILABLE))
+                    // Check for AVX-512
+                    if (IsProcessorFeaturePresent(ProcessorFeature.PF_AVX512_INSTRUCTIONS_AVAILABLE))
+                    {
+                        architecture |= CpuArchitecture.AVX512;
+                    }
+                }
+                else
                 {
-                    architecture |= CpuArchitecture.AVX512;
+                    // Cross-platform fallback - use runtime feature detection
+                    architecture = DetectCpuArchitectureCrossPlatform();
                 }
 
                 // Note: ARM detection would require different APIs
@@ -436,6 +446,61 @@ namespace ZiggyAlloc
             catch
             {
                 // Fallback to basic architecture
+                architecture = CpuArchitecture.Basic;
+            }
+
+            return architecture;
+        }
+
+        /// <summary>
+        /// Cross-platform CPU architecture detection using runtime intrinsics.
+        /// </summary>
+        private static CpuArchitecture DetectCpuArchitectureCrossPlatform()
+        {
+            CpuArchitecture architecture = CpuArchitecture.Basic;
+
+            try
+            {
+                // Use Vector<T> and runtime intrinsics for cross-platform detection
+                if (Vector.IsHardwareAccelerated)
+                {
+                    architecture |= CpuArchitecture.SSE;
+
+                    // Check for AVX support through Vector256
+                    try
+                    {
+                        // This will throw if AVX is not supported
+                        var testVector = Vector256.Create(1.0f);
+                        architecture |= CpuArchitecture.AVX;
+                        architecture |= CpuArchitecture.AVX2;
+                    }
+                    catch
+                    {
+                        // AVX not supported
+                    }
+
+                    // Check for AVX-512 support through Vector512
+                    try
+                    {
+                        // This will throw if AVX-512 is not supported
+                        var testVector = Vector512.Create(1.0f);
+                        architecture |= CpuArchitecture.AVX512;
+                    }
+                    catch
+                    {
+                        // AVX-512 not supported
+                    }
+                }
+
+                // Check for ARM NEON through runtime detection
+                if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                {
+                    architecture |= CpuArchitecture.ARM_NEON;
+                }
+            }
+            catch
+            {
+                // Fallback to basic if detection fails
                 architecture = CpuArchitecture.Basic;
             }
 

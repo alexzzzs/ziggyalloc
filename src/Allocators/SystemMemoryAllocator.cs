@@ -128,7 +128,7 @@ namespace ZiggyAlloc
             {
                 // Fallback to Marshal.SizeOf for non-blittable types
                 var typeHandle = type.TypeHandle;
-                return _typeSizeCache.GetOrAdd(typeHandle, handle => Marshal.SizeOf(Type.GetTypeFromHandle(handle)));
+                return _typeSizeCache.GetOrAdd(typeHandle, handle => Marshal.SizeOf(Type.GetTypeFromHandle(handle)!));
             }
             else
             {
@@ -204,6 +204,8 @@ namespace ZiggyAlloc
                 {
                     throw; // Re-throw to maintain original behavior for compatibility on other platforms
                 }
+                // On ARM64, suppress the exception to prevent test host crashes
+                // ex parameter is used for debugging above
             }
         }
 

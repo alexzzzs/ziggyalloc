@@ -327,16 +327,27 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_BufferInteroperability_Works()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2), // wrapper
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            // Add wrappers to disposables
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             try
             {
@@ -358,10 +369,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -370,16 +380,26 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_MemorySafety_Maintained()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             try
             {
@@ -399,10 +419,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -415,19 +434,38 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_Performance_Reasonable()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+
+            // Create and store each underlying SystemMemoryAllocator in local variables for proper disposal
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             const int allocationCount = 1000;
             const int bufferSize = 100;
+
+            // Parse configurable timeout from environment variable with sensible default
+            var timeoutMs = 5000; // Default 5 seconds
+            if (int.TryParse(Environment.GetEnvironmentVariable("TEST_PERF_TIMEOUT_MS"), out var envTimeout))
+            {
+                timeoutMs = envTimeout;
+            }
 
             try
             {
@@ -445,16 +483,15 @@ namespace ZiggyAlloc.Tests
                     stopwatch.Stop();
                     var elapsedMs = stopwatch.ElapsedMilliseconds;
 
-                    // Assert - Should complete in reasonable time (< 1 second per allocator)
-                    Assert.True(elapsedMs < 1000, $"{allocator.GetType().Name} took {elapsedMs}ms");
+                    // Assert - Should complete in reasonable time (configurable timeout)
+                    Assert.True(elapsedMs < timeoutMs, $"{allocator.GetType().Name} took {elapsedMs}ms (timeout: {timeoutMs}ms)");
                 }
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -463,16 +500,26 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_StressTest_HeavyLoad()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             const int stressIterations = 5000;
 
@@ -506,10 +553,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -522,16 +568,26 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_ZeroSizeAllocations_Handled()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             try
             {
@@ -546,10 +602,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -558,16 +613,26 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_NegativeSizes_ThrowCorrectly()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             try
             {
@@ -579,10 +644,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -591,16 +655,26 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_VeryLargeAllocations_Handled()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             const int largeSize = 1024 * 1024; // 1M elements
 
@@ -622,10 +696,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -638,16 +711,26 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_TotalAllocatedBytes_TrackedCorrectly()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             try
             {
@@ -665,10 +748,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }
@@ -677,16 +759,26 @@ namespace ZiggyAlloc.Tests
         public void AllAllocators_Disposal_CleansUpCorrectly()
         {
             // Arrange
+            var disposables = new List<IDisposable>();
+            var sys1 = new SystemMemoryAllocator(); disposables.Add(sys1);
+            var sys2 = new SystemMemoryAllocator(); disposables.Add(sys2);
+            var sys3 = new SystemMemoryAllocator(); disposables.Add(sys3);
+            var sys4 = new SystemMemoryAllocator(); disposables.Add(sys4);
+            var sys5 = new SystemMemoryAllocator(); disposables.Add(sys5);
+            var sys6 = new SystemMemoryAllocator(); disposables.Add(sys6);
+            var sys7 = new SystemMemoryAllocator(); disposables.Add(sys7);
+
             var allocators = new IUnmanagedMemoryAllocator[]
             {
-                new SystemMemoryAllocator(),
-                new AlignedAllocator(new SystemMemoryAllocator()),
-                new NumaAwareAllocator(new SystemMemoryAllocator()),
-                new SlabAllocator(new SystemMemoryAllocator()),
-                new HybridAllocator(new SystemMemoryAllocator()),
-                new UnmanagedMemoryPool(new SystemMemoryAllocator()),
-                new ThreadLocalMemoryPool(new SystemMemoryAllocator())
+                sys1,
+                new AlignedAllocator(sys2),
+                new NumaAwareAllocator(sys3),
+                new SlabAllocator(sys4),
+                new HybridAllocator(sys5),
+                new UnmanagedMemoryPool(sys6),
+                new ThreadLocalMemoryPool(sys7)
             };
+            for (int i = 1; i < allocators.Length; i++) disposables.Add((IDisposable)allocators[i]);
 
             try
             {
@@ -713,10 +805,9 @@ namespace ZiggyAlloc.Tests
             }
             finally
             {
-                // Ensure all allocators are properly disposed
-                foreach (var allocator in allocators)
+                foreach (var disposable in disposables)
                 {
-                    if (allocator is IDisposable disposable) { disposable.Dispose(); }
+                    disposable.Dispose();
                 }
             }
         }

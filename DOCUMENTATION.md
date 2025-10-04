@@ -96,7 +96,7 @@ Console.WriteLine($"Total allocated: {allocator.TotalAllocatedBytes} bytes");
 Automatically frees all allocations when disposed.
 
 ```csharp
-using var allocator = new ScopedMemoryAllocator();
+using var allocator = new ScopedAllocator();
 using var buffer1 = allocator.Allocate<int>(50);
 using var buffer2 = allocator.Allocate<double>(100);
 
@@ -115,7 +115,7 @@ using var buffer2 = allocator.Allocate<double>(100);
 Tracks allocations and detects memory leaks with caller information.
 
 ```csharp
-using var debugAlloc = new DebugMemoryAllocator("MyComponent", 
+using var debugAlloc = new DebugAllocator("MyComponent",
     Z.DefaultAllocator, MemoryLeakReportingMode.Throw);
 
 using var buffer1 = debugAlloc.Allocate<int>(10); // Properly disposed
@@ -481,7 +481,7 @@ using var buffer = allocator.Allocate<byte>(1024);
 Debug allocator tracks allocations and reports leaks with caller information:
 
 ```csharp
-using var debugAlloc = new DebugMemoryAllocator("Test", Z.DefaultAllocator, 
+using var debugAlloc = new DebugAllocator("Test", Z.DefaultAllocator,
     MemoryLeakReportingMode.Throw);
 
 var buffer = debugAlloc.Allocate<int>(10);
@@ -542,10 +542,10 @@ public sealed class SystemMemoryAllocator : IUnmanagedMemoryAllocator
 }
 ```
 
-### ScopedMemoryAllocator
+### ScopedAllocator
 
 ```csharp
-public sealed class ScopedMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
+public sealed class ScopedAllocator : IUnmanagedMemoryAllocator, IDisposable
 {
     // Allocate memory (freed when allocator is disposed)
     public UnmanagedBuffer<T> Allocate<T>(int elementCount, bool zeroMemory = false);
@@ -562,13 +562,13 @@ public sealed class ScopedMemoryAllocator : IUnmanagedMemoryAllocator, IDisposab
 }
 ```
 
-### DebugMemoryAllocator
+### DebugAllocator
 
 ```csharp
-public sealed class DebugMemoryAllocator : IUnmanagedMemoryAllocator, IDisposable
+public sealed class DebugAllocator : IUnmanagedMemoryAllocator, IDisposable
 {
     // Constructor
-    public DebugMemoryAllocator(string name, IUnmanagedMemoryAllocator backingAllocator, 
+    public DebugAllocator(string name, IUnmanagedMemoryAllocator backingAllocator,
         MemoryLeakReportingMode reportingMode = MemoryLeakReportingMode.Log);
     
     // Allocate with caller tracking
@@ -712,10 +712,10 @@ public sealed class SlabAllocator : IUnmanagedMemoryAllocator, IDisposable
 var system = new SystemMemoryAllocator();
 
 // For temporary allocations within a scope
-using var scoped = new ScopedMemoryAllocator();
+using var scoped = new ScopedAllocator();
 
 // For development and debugging
-using var debug = new DebugMemoryAllocator("Component", Z.DefaultAllocator);
+using var debug = new DebugAllocator("Component", Z.DefaultAllocator);
 
 // For frequent allocations of similar sizes
 using var slab = new SlabAllocator(Z.DefaultAllocator);
@@ -1002,7 +1002,7 @@ public class ResourceManager
 ```csharp
 public class BufferPool
 {
-    private readonly ScopedMemoryAllocator _allocator = new();
+    private readonly ScopedAllocator _allocator = new();
     
     public Slice<T> GetBuffer<T>(int size) where T : unmanaged
     {

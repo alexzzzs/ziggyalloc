@@ -6,13 +6,13 @@ using ZiggyAlloc;
 
 namespace ZiggyAlloc.Tests
 {
-    public class ScopedMemoryAllocatorAdditionalTests
+    public class ScopedAllocatorAdditionalTests
     {
         [Fact]
-        public void ScopedMemoryAllocator_DisposeMultipleTimes_HandledGracefully()
+        public void ScopedAllocator_DisposeMultipleTimes_HandledGracefully()
         {
             // Arrange
-            var allocator = new ScopedMemoryAllocator();
+            var allocator = new ScopedAllocator();
             using (allocator)
             {
                 using var buffer = allocator.Allocate<int>(10);
@@ -27,10 +27,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_UseAfterDispose_ThrowsObjectDisposedException()
+        public void ScopedAllocator_UseAfterDispose_ThrowsObjectDisposedException()
         {
             // Arrange
-            var allocator = new ScopedMemoryAllocator();
+            var allocator = new ScopedAllocator();
             allocator.Dispose(); // Dispose first
             
             // Act & Assert
@@ -39,10 +39,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_LargeNumberOfAllocations_HandledCorrectly()
+        public void ScopedAllocator_LargeNumberOfAllocations_HandledCorrectly()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
             const int allocationCount = 10000;
             
             // Act
@@ -60,10 +60,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_VeryLargeAllocation_HandledCorrectly()
+        public void ScopedAllocator_VeryLargeAllocation_HandledCorrectly()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
             const int veryLargeSize = 50_000_000; // 50M elements
             
             // Act
@@ -75,10 +75,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_StructTypeAllocation_Works()
+        public void ScopedAllocator_StructTypeAllocation_Works()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
             
             // Act
             using var buffer = allocator.Allocate<Point3D>(1000);
@@ -98,7 +98,7 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public async Task ScopedMemoryAllocator_ConcurrentAllocations_ThreadSafe()
+        public async Task ScopedAllocator_ConcurrentAllocations_ThreadSafe()
         {
             // Arrange
             var baseAllocator = new SystemMemoryAllocator();
@@ -114,7 +114,7 @@ namespace ZiggyAlloc.Tests
                 {
                     for (int i = 0; i < allocationsPerThread; i++)
                     {
-                        using var scope = new ScopedMemoryAllocator();
+                        using var scope = new ScopedAllocator();
                         using var buffer = scope.Allocate<int>(50 + threadId);
                         // Do some work with the buffer
                         for (int j = 0; j < Math.Min(10, buffer.Length); j++)
@@ -149,7 +149,7 @@ namespace ZiggyAlloc.Tests
                 {
                     for (int i = 0; i < allocationsPerThread; i++)
                     {
-                        using var allocator = new ScopedMemoryAllocator();
+                        using var allocator = new ScopedAllocator();
                         using var buffer = allocator.Allocate<int>(100 + threadId * 10);
                         // Do some work with the buffer
                         for (int j = 0; j < Math.Min(10, buffer.Length); j++)
@@ -169,20 +169,20 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_NestedAllocators_LargeHierarchy()
+        public void ScopedAllocator_NestedAllocators_LargeHierarchy()
         {
             // Arrange & Act
-            using var level1 = new ScopedMemoryAllocator();
+            using var level1 = new ScopedAllocator();
             using var buffer1 = level1.Allocate<int>(100);
             
             for (int i = 0; i < 10; i++)
             {
-                using var level2 = new ScopedMemoryAllocator();
+                using var level2 = new ScopedAllocator();
                 using var buffer2 = level2.Allocate<double>(50);
                 
                 for (int j = 0; j < 5; j++)
                 {
-                    using var level3 = new ScopedMemoryAllocator();
+                    using var level3 = new ScopedAllocator();
                     using var buffer3 = level3.Allocate<byte>(25);
                     
                     // Use buffers
@@ -198,10 +198,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_AllocationPatterns_MixedSizes()
+        public void ScopedAllocator_AllocationPatterns_MixedSizes()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
             
             // Act - Allocate buffers with exponentially increasing sizes
             for (int i = 0; i < 20; i++)

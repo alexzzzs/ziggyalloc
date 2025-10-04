@@ -54,8 +54,8 @@ Compares different allocator patterns:
 ### AllocatorComparisonBenchmarks.cs
 Direct comparison between different allocator implementations:
 - SystemMemoryAllocator
-- DebugMemoryAllocator
-- ScopedMemoryAllocator
+- DebugAllocator
+- ScopedAllocator
 
 ### DataTypeBenchmarks.cs
 Performance comparison across different data types:
@@ -206,7 +206,7 @@ dotnet run -c Release --filter *Benchmarks* --join
 | Allocator | Performance | GC Pressure | Memory Overhead | Best Use Case |
 |-----------|-------------|-------------|-----------------|---------------|
 | **SystemMemoryAllocator** | ⚡ High | ❌ None | Low | General purpose |
-| **ScopedMemoryAllocator** | ⚡⚡ Very High | ❌ None | Low | Temporary allocations |
+| **ScopedAllocator** | ⚡⚡ Very High | ❌ None | Low | Temporary allocations |
 | **UnmanagedMemoryPool** | ⚡⚡ Very High | ❌ None | Medium | Frequent allocations |
 | **HybridAllocator** | ⚡⚡ Adaptive | ⚡ Intelligent | Low | Mixed workloads |
 

@@ -39,14 +39,6 @@ namespace ZiggyAlloc
         private readonly ConcurrentQueue<SharedBuffer>? _sharedBuffers;
         private readonly Timer? _cleanupTimer;
 
-        // Pre-defined size classes for common allocation sizes (same as UnmanagedMemoryPool)
-        private static readonly int[] SizeClasses = {
-            16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256,
-            320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096
-        };
-
-        private const int MaxSizeClasses = 32;
-        private const int MaxSlotsPerClass = 1024;
 
         private long _totalAllocatedBytes;
         private long _totalPoolsCreated;
@@ -204,21 +196,23 @@ namespace ZiggyAlloc
             if (_disposed)
                 return;
 
-            // Clear all thread-local pools
+            // Clear all thread-local pools and account for freed bytes
+            long totalFreedBytes = 0;
             if (_threadLocalPools.Values != null)
             {
                 foreach (var threadPool in _threadLocalPools.Values)
                 {
-                    threadPool.Clear();
+                    totalFreedBytes += threadPool.Clear();
                 }
             }
 
-            // Clear shared buffers
+            // Clear shared buffers and account for freed bytes
             if (_enableCrossThreadSharing && _sharedBuffers != null)
             {
                 while (_sharedBuffers.TryDequeue(out var sharedBuffer))
                 {
                     _baseAllocator.Free(sharedBuffer.Pointer);
+                    totalFreedBytes += sharedBuffer.Size;
                 }
             }
 
@@ -256,7 +250,7 @@ namespace ZiggyAlloc
         {
             Interlocked.Increment(ref _totalPoolsCreated);
             Interlocked.Increment(ref _activePoolCount);
-            return new ThreadLocalPoolData(DecrementActivePoolCount);
+            return new ThreadLocalPoolData(_baseAllocator, DecrementActivePoolCount);
         }
 
         /// <summary>
@@ -272,21 +266,22 @@ namespace ZiggyAlloc
         /// </summary>
         private ThreadLocalPoolData GetThreadLocalPool()
         {
-            return _threadLocalPools.Value ?? new ThreadLocalPoolData();
+            return _threadLocalPools.Value ?? new ThreadLocalPoolData(_baseAllocator);
         }
 
         /// <summary>
         /// Cleans up abandoned thread pools (called periodically).
         /// </summary>
+        private const int MaxSharedBuffers = 1000;
+
         private void CleanupAbandonedPools(object? state)
         {
-            // This is a simple cleanup - in a production system, you might want to track
-            // thread lifecycle more carefully to avoid false positives
+            if (_disposed)
+                return;
+
             if (_enableCrossThreadSharing && _sharedBuffers != null)
             {
-                // Process shared buffers that have been waiting too long
-                const int maxSharedBuffers = 1000;
-                while (_sharedBuffers.Count > maxSharedBuffers)
+                while (_sharedBuffers.Count > MaxSharedBuffers)
                 {
                     if (_sharedBuffers.TryDequeue(out var sharedBuffer))
                     {
@@ -300,21 +295,13 @@ namespace ZiggyAlloc
                 }
             }
         }
-
         /// <summary>
         /// Finds the appropriate size class for the given size.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int FindSizeClass(int sizeInBytes)
         {
-            for (int i = 0; i < MaxSizeClasses && i < SizeClasses.Length; i++)
-            {
-                if (SizeClasses[i] >= sizeInBytes)
-                {
-                    return i;
-                }
-            }
-            return -1; // No suitable size class
+            return AllocatorConstants.FindSizeClass(sizeInBytes);
         }
 
         /// <summary>
@@ -352,9 +339,9 @@ namespace ZiggyAlloc
         private sealed class ThreadLocalPoolData
         {
             // Size-class pools (no locks needed since they're thread-local)
-            private readonly IntPtr[][] _sizeClassPools = new IntPtr[MaxSizeClasses][];
-            private readonly int[] _sizeClassSizes = new int[MaxSizeClasses];
-            private readonly int[] _poolCounts = new int[MaxSizeClasses];
+            private readonly IntPtr[][] _sizeClassPools = new IntPtr[AllocatorConstants.MaxSizeClasses][];
+            private readonly int[] _sizeClassSizes = new int[AllocatorConstants.MaxSizeClasses];
+            private readonly int[] _poolCounts = new int[AllocatorConstants.MaxSizeClasses];
 
             // Fallback pool for uncommon sizes
             private readonly ConcurrentDictionary<int, ConcurrentStack<IntPtr>> _fallbackPools = new();
@@ -362,18 +349,22 @@ namespace ZiggyAlloc
             // Track allocations made by this thread for proper cleanup
             private readonly ConcurrentDictionary<IntPtr, int> _threadAllocations = new();
 
+            // Base allocator for freeing buffers
+            private readonly IUnmanagedMemoryAllocator _baseAllocator;
+
             // Callback to decrement active pool count when this instance is disposed
             private readonly Action? _disposeCallback;
 
-            public ThreadLocalPoolData(Action? disposeCallback = null)
+            public ThreadLocalPoolData(IUnmanagedMemoryAllocator baseAllocator, Action? disposeCallback = null)
             {
+                _baseAllocator = baseAllocator ?? throw new ArgumentNullException(nameof(baseAllocator));
                 _disposeCallback = disposeCallback;
 
                 // Initialize size classes
-                for (int i = 0; i < MaxSizeClasses && i < SizeClasses.Length; i++)
+                for (int i = 0; i < AllocatorConstants.MaxSizeClasses && i < AllocatorConstants.SizeClasses.Length; i++)
                 {
-                    _sizeClassSizes[i] = SizeClasses[i];
-                    _sizeClassPools[i] = new IntPtr[MaxSlotsPerClass];
+                    _sizeClassSizes[i] = AllocatorConstants.SizeClasses[i];
+                    _sizeClassPools[i] = new IntPtr[AllocatorConstants.MaxSlotsPerClass];
                 }
             }
 
@@ -388,7 +379,7 @@ namespace ZiggyAlloc
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool TryAllocateFromSizeClass(int sizeClassIndex, out IntPtr pointer)
             {
-                if (sizeClassIndex < 0 || sizeClassIndex >= MaxSizeClasses)
+                if (sizeClassIndex < 0 || sizeClassIndex >= AllocatorConstants.MaxSizeClasses)
                 {
                     pointer = IntPtr.Zero;
                     return false;
@@ -466,7 +457,7 @@ namespace ZiggyAlloc
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private bool TryReturnToSizeClass(int sizeClassIndex, IntPtr pointer)
             {
-                if (sizeClassIndex < 0 || sizeClassIndex >= MaxSizeClasses)
+                if (sizeClassIndex < 0 || sizeClassIndex >= AllocatorConstants.MaxSizeClasses)
                 {
                     return false;
                 }
@@ -474,7 +465,7 @@ namespace ZiggyAlloc
                 var pool = _sizeClassPools[sizeClassIndex];
                 int count = _poolCounts[sizeClassIndex];
 
-                if (count < MaxSlotsPerClass)
+                if (count < AllocatorConstants.MaxSlotsPerClass)
                 {
                     pool[count] = pointer;
                     _poolCounts[sizeClassIndex] = count + 1;
@@ -487,19 +478,51 @@ namespace ZiggyAlloc
             /// <summary>
             /// Clears all pools in this thread-local data.
             /// </summary>
-            public void Clear()
+            /// <returns>The total number of bytes that were freed</returns>
+            public long Clear()
             {
-                // Clear size-class pools
-                for (int i = 0; i < MaxSizeClasses; i++)
+                long totalFreedBytes = 0;
+
+                // Free all buffers in size-class pools before clearing
+                for (int i = 0; i < AllocatorConstants.MaxSizeClasses; i++)
                 {
+                    var pool = _sizeClassPools[i];
+                    int count = _poolCounts[i];
+
+                    // Free each buffer in the pool (guard against null pointers)
+                    for (int j = 0; j < count; j++)
+                    {
+                        if (pool[j] != IntPtr.Zero)
+                        {
+                            _baseAllocator.Free(pool[j]);
+                            totalFreedBytes += _sizeClassSizes[i];
+                        }
+                    }
+
                     _poolCounts[i] = 0;
                 }
 
-                // Clear fallback pools
+                // Free all buffers in fallback pools before clearing
+                foreach (var kvp in _fallbackPools)
+                {
+                    var fallbackPool = kvp.Value;
+                    int sizeInBytes = kvp.Key;
+
+                    while (fallbackPool.TryPop(out var pointer))
+                    {
+                        if (pointer != IntPtr.Zero)
+                        {
+                            _baseAllocator.Free(pointer);
+                            totalFreedBytes += sizeInBytes;
+                        }
+                    }
+                }
                 _fallbackPools.Clear();
 
-                // Clear tracked allocations
+                // Clear tracked allocations (these are just tracking, not actual allocations to free)
                 _threadAllocations.Clear();
+
+                return totalFreedBytes;
             }
 
             /// <summary>
@@ -532,7 +555,7 @@ namespace ZiggyAlloc
                 long total = 0;
 
                 // Add memory from size-class pools
-                for (int i = 0; i < MaxSizeClasses; i++)
+                for (int i = 0; i < AllocatorConstants.MaxSizeClasses; i++)
                 {
                     int count = _poolCounts[i];
                     if (count > 0 && i < _sizeClassSizes.Length)

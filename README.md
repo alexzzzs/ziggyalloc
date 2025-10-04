@@ -127,8 +127,8 @@ Different allocators for different use cases:
 | Allocator | Best For | Thread Safety | GC Pressure | Performance |
 |-----------|----------|---------------|-------------|-------------|
 | **SystemMemoryAllocator** | General purpose | ✅ Safe | ❌ None | ⚡ High |
-| **ScopedMemoryAllocator** | Temporary allocations | ❌ Not safe | ❌ None | ⚡⚡ Very High |
-| **DebugMemoryAllocator** | Development/testing | ✅ Safe | ❌ None | ⚡ Medium |
+| **ScopedAllocator** | Temporary allocations | ❌ Not safe | ❌ None | ⚡⚡ Very High |
+| **DebugAllocator** | Development/testing | ✅ Safe | ❌ None | ⚡ Medium |
 | **UnmanagedMemoryPool** | Frequent allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
 | **HybridAllocator** | Mixed workloads | ✅ Safe | ⚡ Adaptive | ⚡⚡ Very High |
 | **SlabAllocator** | High-frequency small allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
@@ -143,8 +143,8 @@ Different allocators for different use cases:
 ```mermaid
 graph TD
     A[IUnmanagedMemoryAllocator] --> B[SystemMemoryAllocator]
-    A --> C[ScopedMemoryAllocator]
-    A --> D[DebugMemoryAllocator]
+    A --> C[ScopedAllocator]
+    A --> D[DebugAllocator]
     A --> E[UnmanagedMemoryPool]
     A --> F[HybridAllocator]
     A --> G[SlabAllocator]
@@ -188,10 +188,10 @@ span.Fill(123);
 #### SystemMemoryAllocator
 Direct system memory allocation with tracking.
 
-#### ScopedMemoryAllocator
+#### ScopedAllocator
 Arena-style allocator that frees all memory when disposed.
 
-#### DebugMemoryAllocator
+#### DebugAllocator
 Tracks allocations and detects memory leaks with caller information.
 
 #### UnmanagedMemoryPool

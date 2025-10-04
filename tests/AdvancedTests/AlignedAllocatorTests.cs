@@ -256,7 +256,7 @@ namespace ZiggyAlloc.Tests
             // Assert
             Assert.NotEqual(CpuArchitecture.Basic, statistics.CpuArchitecture);
             Assert.True(statistics.CacheLineSize > 0);
-            Assert.NotEqual(AlignmentStrategy.Auto, statistics.Strategy);
+            Assert.Equal(AlignmentStrategy.Auto, statistics.Strategy);
             Assert.True(statistics.TotalAlignedAllocations >= 0);
             Assert.True(statistics.TotalPaddingBytes >= 0);
             Assert.True(statistics.AlignmentEfficiency >= 0.0);

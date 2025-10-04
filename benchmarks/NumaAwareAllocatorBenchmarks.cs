@@ -135,23 +135,28 @@ namespace ZiggyAlloc.Benchmarks
         {
             var buffers = new UnmanagedBuffer<int>[100];
 
-            // Allocate
-            for (int i = 0; i < buffers.Length; i++)
+            try
             {
-                buffers[i] = _numaAllocator!.Allocate<int>(100);
-                buffers[i][0] = i;
-            }
+                // Allocate
+                for (int i = 0; i < buffers.Length; i++)
+                {
+                    buffers[i] = _numaAllocator!.Allocate<int>(100);
+                    buffers[i][0] = i;
+                }
 
-            // Use
-            for (int i = 0; i < buffers.Length; i++)
-            {
-                buffers[i][1] = buffers[i][0] * 2;
+                // Use
+                for (int i = 0; i < buffers.Length; i++)
+                {
+                    buffers[i][1] = buffers[i][0] * 2;
+                }
             }
-
-            // Cleanup
-            for (int i = 0; i < buffers.Length; i++)
+            finally
             {
-                buffers[i].Dispose();
+                // Cleanup - guaranteed to run even if exception occurs during Use phase
+                for (int i = 0; i < buffers.Length; i++)
+                {
+                    buffers[i]?.Dispose();
+                }
             }
         }
 
@@ -271,31 +276,34 @@ namespace ZiggyAlloc.Benchmarks
         {
             // This benchmark simulates accessing memory that might be on different NUMA nodes
             var buffers = new UnmanagedBuffer<int>[50];
-
-            // Allocate on multiple "nodes" (simulated by different sizes/patterns)
-            for (int i = 0; i < buffers.Length; i++)
+            try
             {
-                int size = 100 + (i % 3) * 50; // Vary sizes to potentially hit different nodes
-                buffers[i] = _numaAllocator!.Allocate<int>(size);
-                buffers[i][0] = i;
-            }
-
-            // Access all buffers (simulating cross-node access)
-            for (int i = 0; i < buffers.Length; i++)
-            {
-                for (int j = 0; j < buffers.Length; j++)
+                // Allocate on multiple "nodes" (simulated by different sizes/patterns)
+                for (int i = 0; i < buffers.Length; i++)
                 {
-                    buffers[i][j % buffers[i].Length] = buffers[j][0];
+                    int size = 100 + (i % 3) * 50; // Vary sizes to potentially hit different nodes
+                    buffers[i] = _numaAllocator!.Allocate<int>(size);
+                    buffers[i][0] = i;
+                }
+
+                // Access all buffers (simulating cross-node access)
+                for (int i = 0; i < buffers.Length; i++)
+                {
+                    for (int j = 0; j < buffers.Length; j++)
+                    {
+                        buffers[i][j % buffers[i].Length] = buffers[j][0];
+                    }
                 }
             }
-
-            // Cleanup
-            for (int i = 0; i < buffers.Length; i++)
+            finally
             {
-                buffers[i].Dispose();
+                // Cleanup
+                for (int i = 0; i < buffers.Length; i++)
+                {
+                    buffers[i]?.Dispose();
+                }
             }
         }
-
         // Helper struct for struct allocation benchmarks
         private struct Point3D
         {

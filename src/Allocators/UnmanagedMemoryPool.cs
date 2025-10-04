@@ -29,24 +29,17 @@ namespace ZiggyAlloc
         private readonly IUnmanagedMemoryAllocator _baseAllocator;
 
         // Optimized size-class based pools using arrays for better performance
-        private const int MaxSizeClasses = 32;
-        private const int MaxSlotsPerClass = 1024;
 
-        // Pre-defined size classes for common allocation sizes
-        private static readonly int[] SizeClasses = {
-            16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256,
-            320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096
-        };
 
         // Lock-free size-class pools using correct atomic operations
-        private readonly LockFreeSizeClass[] _sizeClasses = new LockFreeSizeClass[MaxSizeClasses];
+        private readonly LockFreeSizeClass[] _sizeClasses = new LockFreeSizeClass[AllocatorConstants.MaxSizeClasses];
 
         // Fallback pool for uncommon sizes
         private readonly ConcurrentDictionary<int, ConcurrentStack<IntPtr>> _fallbackPools = new();
 
         // Dynamic size class tracking for optimization
-        private readonly long[] _sizeClassUsage = new long[MaxSizeClasses];
-        private readonly long[] _sizeClassHits = new long[MaxSizeClasses];
+        private readonly long[] _sizeClassUsage = new long[AllocatorConstants.MaxSizeClasses];
+        private readonly long[] _sizeClassHits = new long[AllocatorConstants.MaxSizeClasses];
         private long _lastOptimizationTime = 0;
         private const long OptimizationInterval = 1000000; // Optimize every 1M operations
 
@@ -77,9 +70,9 @@ namespace ZiggyAlloc
             _baseAllocator = baseAllocator ?? throw new ArgumentNullException(nameof(baseAllocator));
 
             // Initialize lock-free size classes
-            for (int i = 0; i < MaxSizeClasses && i < SizeClasses.Length; i++)
+            for (int i = 0; i < AllocatorConstants.MaxSizeClasses && i < AllocatorConstants.SizeClasses.Length; i++)
             {
-                _sizeClasses[i] = new LockFreeSizeClass(MaxSlotsPerClass);
+                _sizeClasses[i] = new LockFreeSizeClass(AllocatorConstants.MaxSlotsPerClass);
             }
         }
 
@@ -202,6 +195,7 @@ namespace ZiggyAlloc
                 System.Diagnostics.Debug.WriteLine($"Exception during memory cleanup in UnmanagedMemoryPool.Free: {ex}");
                 #endif
                 throw; // Re-throw to maintain original behavior for compatibility
+                // ex parameter is used for debugging above
             }
         }
 
@@ -214,7 +208,7 @@ namespace ZiggyAlloc
                 return;
 
             // Clear lock-free size-class pools
-            for (int i = 0; i < MaxSizeClasses; i++)
+            for (int i = 0; i < AllocatorConstants.MaxSizeClasses; i++)
             {
                 while (_sizeClasses[i].TryPop(out var pointer))
                 {
@@ -270,6 +264,7 @@ namespace ZiggyAlloc
                     System.Diagnostics.Debug.WriteLine($"Exception during disposal in UnmanagedMemoryPool.Dispose: {ex}");
                     #endif
                     throw; // Re-throw to maintain original behavior for compatibility
+                    // ex parameter is used for debugging above
                 }
             }
         }
@@ -280,15 +275,7 @@ namespace ZiggyAlloc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int FindSizeClass(int sizeInBytes)
         {
-            // Simple linear search for size class - optimized for common sizes
-            for (int i = 0; i < MaxSizeClasses && i < SizeClasses.Length; i++)
-            {
-                if (SizeClasses[i] >= sizeInBytes)
-                {
-                    return i;
-                }
-            }
-            return -1; // No suitable size class
+            return AllocatorConstants.FindSizeClass(sizeInBytes);
         }
 
         /// <summary>
@@ -338,10 +325,13 @@ namespace ZiggyAlloc
                     if (currentCount <= 0) return false;
 
                     int newCount = currentCount - 1;
-                    pointer = _slots[newCount]; // safe to read here
 
+                    // Use CAS to atomically validate count and get pointer
+                    // This prevents race conditions between reading the slot and updating count
                     if (Interlocked.CompareExchange(ref _count, newCount, currentCount) == currentCount)
                     {
+                        // CAS succeeded, now it's safe to read the slot
+                        pointer = _slots[newCount];
                         return true;
                     }
                     // Failed CAS → retry
@@ -358,7 +348,7 @@ namespace ZiggyAlloc
         {
             // Check if enough time has passed for optimization
             long totalOperations = 0;
-            for (int i = 0; i < MaxSizeClasses; i++)
+            for (int i = 0; i < AllocatorConstants.MaxSizeClasses; i++)
             {
                 totalOperations += _sizeClassUsage[i];
             }
@@ -383,7 +373,7 @@ namespace ZiggyAlloc
             long maxUsage = 0;
             long minUsage = long.MaxValue;
 
-            for (int i = 0; i < MaxSizeClasses; i++)
+            for (int i = 0; i < AllocatorConstants.MaxSizeClasses; i++)
             {
                 long usage = _sizeClassUsage[i];
                 if (usage > maxUsage)

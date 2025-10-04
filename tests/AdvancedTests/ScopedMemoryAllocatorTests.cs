@@ -4,13 +4,13 @@ using ZiggyAlloc;
 
 namespace ZiggyAlloc.Tests
 {
-    public class ScopedMemoryAllocatorTests
+    public class ScopedAllocatorTests
     {
         [Fact]
-        public void ScopedMemoryAllocator_BasicAllocation_Works()
+        public void ScopedAllocator_BasicAllocation_Works()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Act
             using var buffer = allocator.Allocate<int>(100);
@@ -22,10 +22,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_MultipleAllocations_TrackedCorrectly()
+        public void ScopedAllocator_MultipleAllocations_TrackedCorrectly()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Act
             using var buffer1 = allocator.Allocate<int>(10);
@@ -44,10 +44,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_Dispose_FreesAllMemory()
+        public void ScopedAllocator_Dispose_FreesAllMemory()
         {
             // Arrange
-            var allocator = new ScopedMemoryAllocator();
+            var allocator = new ScopedAllocator();
             using (allocator)
             {
                 using var buffer1 = allocator.Allocate<int>(100);
@@ -69,10 +69,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_ZeroMemoryFlag_Works()
+        public void ScopedAllocator_ZeroMemoryFlag_Works()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Act
             using var buffer = allocator.Allocate<int>(10, zeroMemory: true);
@@ -85,10 +85,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_DoesNotSupportIndividualDeallocation()
+        public void ScopedAllocator_DoesNotSupportIndividualDeallocation()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Act & Assert
             Assert.False(allocator.SupportsIndividualDeallocation);
@@ -98,13 +98,13 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_NestedScopes_WorkIndependently()
+        public void ScopedAllocator_NestedScopes_WorkIndependently()
         {
             // Arrange & Act
-            using var outerAllocator = new ScopedMemoryAllocator();
+            using var outerAllocator = new ScopedAllocator();
             using var outerBuffer = outerAllocator.Allocate<int>(100);
             
-            using (var innerAllocator = new ScopedMemoryAllocator())
+            using (var innerAllocator = new ScopedAllocator())
             {
                 using var innerBuffer = innerAllocator.Allocate<double>(50);
                 
@@ -125,10 +125,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_EmptyAllocation_HandledCorrectly()
+        public void ScopedAllocator_EmptyAllocation_HandledCorrectly()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Act
             using var buffer = allocator.Allocate<int>(0);
@@ -140,20 +140,20 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_NegativeSize_ThrowsException()
+        public void ScopedAllocator_NegativeSize_ThrowsException()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Act & Assert
             Assert.Throws<ArgumentOutOfRangeException>(() => allocator.Allocate<int>(-1));
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_LargeAllocation_Works()
+        public void ScopedAllocator_LargeAllocation_Works()
         {
             // Arrange
-            using var allocator = new ScopedMemoryAllocator();
+            using var allocator = new ScopedAllocator();
 
             // Act
             const int largeSize = 1000000; // 1M elements
@@ -166,10 +166,10 @@ namespace ZiggyAlloc.Tests
         }
 
         [Fact]
-        public void ScopedMemoryAllocator_BufferReuseAfterDispose_HandledCorrectly()
+        public void ScopedAllocator_BufferReuseAfterDispose_HandledCorrectly()
         {
             // Arrange
-            using (var allocator = new ScopedMemoryAllocator())
+            using (var allocator = new ScopedAllocator())
             {
                 var buffer = allocator.Allocate<int>(10);
                 buffer[0] = 42;

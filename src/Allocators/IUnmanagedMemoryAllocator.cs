@@ -9,8 +9,8 @@ namespace ZiggyAlloc
     /// Implementations of this interface provide different strategies for unmanaged memory allocation:
     /// <list type="bullet">
     /// <item><description><see cref="SystemMemoryAllocator"/> - Direct system memory allocation</description></item>
-    /// <item><description><see cref="ScopedMemoryAllocator"/> - Arena-style allocator with bulk cleanup</description></item>
-    /// <item><description><see cref="DebugMemoryAllocator"/> - Allocator with leak detection for development</description></item>
+    /// <item><description><see cref="ScopedAllocator"/> - Arena-style allocator with bulk cleanup</description></item>
+    /// <item><description><see cref="DebugAllocator"/> - Allocator with leak detection for development</description></item>
     /// <item><description><see cref="UnmanagedMemoryPool"/> - Pool-based allocator for frequent allocations</description></item>
     /// <item><description><see cref="HybridAllocator"/> - Intelligent allocator choosing strategy based on size/type</description></item>
     /// <item><description><see cref="SlabAllocator"/> - Slab-based allocator for high-frequency small allocations</description></item>
@@ -43,7 +43,7 @@ namespace ZiggyAlloc
         /// </summary>
         /// <param name="pointer">The pointer to the memory to free. Can be IntPtr.Zero, in which case the method does nothing.</param>
         /// <remarks>
-        /// Not all allocators support individual deallocation. For example, <see cref="ScopedMemoryAllocator"/> 
+        /// Not all allocators support individual deallocation. For example, <see cref="ScopedAllocator"/>
         /// manages memory in bulk and throws <see cref="NotSupportedException"/> when this method is called.
         /// </remarks>
         /// <exception cref="NotSupportedException">Thrown by allocators that don't support individual deallocation.</exception>
@@ -57,7 +57,7 @@ namespace ZiggyAlloc
         /// </value>
         /// <remarks>
         /// Allocators like <see cref="SystemMemoryAllocator"/> and <see cref="UnmanagedMemoryPool"/> return true,
-        /// while <see cref="ScopedMemoryAllocator"/> returns false as it manages memory in bulk.
+        /// while <see cref="ScopedAllocator"/> returns false as it manages memory in bulk.
         /// </remarks>
         bool SupportsIndividualDeallocation { get; }
 
