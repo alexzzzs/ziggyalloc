@@ -41,8 +41,8 @@ namespace ZiggyAlloc
         // Lock-free size-class pools using atomic operations
         private readonly LockFreeSizeClass[] _sizeClasses = new LockFreeSizeClass[MaxSizeClasses];
 
-        // Fallback pool for uncommon sizes
-        private readonly ConcurrentDictionary<int, LockFreeStack> _fallbackPools = new();
+        // Fallback pool for uncommon sizes - use reliable ConcurrentStack
+        private readonly ConcurrentDictionary<int, ConcurrentStack<IntPtr>> _fallbackPools = new();
 
         // Dynamic size class tracking for optimization
         private readonly long[] _sizeClassUsage = new long[MaxSizeClasses];
@@ -132,8 +132,8 @@ namespace ZiggyAlloc
                 }
             }
 
-            // Fallback to lock-free pools for uncommon sizes
-            var fallbackPool = _fallbackPools.GetOrAdd(sizeInBytes, _ => new LockFreeStack());
+            // Fallback to concurrent pools for uncommon sizes
+            var fallbackPool = _fallbackPools.GetOrAdd(sizeInBytes, _ => new ConcurrentStack<IntPtr>());
             if (fallbackPool.TryPop(out var fallbackPointer))
             {
                 if (zeroMemory)
@@ -185,9 +185,9 @@ namespace ZiggyAlloc
                         return;
                     }
 
-                    // Fallback to lock-free pools for uncommon sizes
-                    var fallbackPool = _fallbackPools.GetOrAdd(size, _ => new LockFreeStack());
-                    fallbackPool.TryPush(pointer);
+                    // Fallback to concurrent pools for uncommon sizes
+                    var fallbackPool = _fallbackPools.GetOrAdd(size, _ => new ConcurrentStack<IntPtr>());
+                    fallbackPool.Push(pointer);
                 }
                 else
                 {
@@ -313,86 +313,45 @@ namespace ZiggyAlloc
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool TryPush(IntPtr pointer)
             {
-                int count = Volatile.Read(ref _count);
-                if (count >= _maxSlots)
-                    return false;
-
-                if (Interlocked.CompareExchange(ref _count, count + 1, count) == count)
-                {
-                    _slots[count] = pointer;
-                    return true;
-                }
-
-                return false;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool TryPop(out IntPtr pointer)
-            {
-                pointer = IntPtr.Zero;
-
-                int count = Volatile.Read(ref _count);
-                if (count <= 0)
-                    return false;
-
-                if (Interlocked.CompareExchange(ref _count, count - 1, count) == count)
-                {
-                    pointer = _slots[count - 1];
-                    return true;
-                }
-
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Lock-free stack implementation using atomic operations.
-        /// </summary>
-        private sealed class LockFreeStack
-        {
-            private volatile LockFreeNode? _head;
-
-            private class LockFreeNode
-            {
-                public IntPtr Pointer;
-                public LockFreeNode? Next;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool TryPush(IntPtr pointer)
-            {
-                var node = new LockFreeNode { Pointer = pointer };
-                LockFreeNode currentHead;
-
+                // Use lock-free approach with proper bounds checking
+                int currentCount, newCount;
                 do
                 {
-                    currentHead = _head;
-                    node.Next = currentHead;
-                }
-                while (Interlocked.CompareExchange(ref _head, node, currentHead) != currentHead);
-
-                return true;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool TryPop(out IntPtr pointer)
-            {
-                pointer = IntPtr.Zero;
-                LockFreeNode currentHead;
-
-                do
-                {
-                    currentHead = _head;
-                    if (currentHead == null)
+                    currentCount = _count;
+                    if (currentCount >= _maxSlots)
                         return false;
 
-                    pointer = currentHead.Pointer;
+                    newCount = currentCount + 1;
                 }
-                while (Interlocked.CompareExchange(ref _head, currentHead.Next, currentHead) != currentHead);
+                while (Interlocked.CompareExchange(ref _count, newCount, currentCount) != currentCount);
+
+                // Store the pointer after successfully incrementing count
+                _slots[currentCount] = pointer;
+                return true;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool TryPop(out IntPtr pointer)
+            {
+                pointer = IntPtr.Zero;
+
+                // Use lock-free approach with proper bounds checking
+                int currentCount, newCount;
+                do
+                {
+                    currentCount = _count;
+                    if (currentCount <= 0)
+                        return false;
+
+                    newCount = currentCount - 1;
+                    pointer = _slots[currentCount - 1];
+                }
+                while (Interlocked.CompareExchange(ref _count, newCount, currentCount) != currentCount);
 
                 return true;
             }
         }
+
 
         /// <summary>
         /// Attempts to optimize size classes based on usage patterns.
