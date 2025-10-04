@@ -22,11 +22,6 @@ namespace ZiggyAlloc
         private const int DOUBLE_THRESHOLD = 128;
         private const int STRUCT_THRESHOLD = 64;
 
-        // Constants for allocation strategy calculations
-        private const int MIN_THRESHOLD = 32; // Minimum threshold for unknown types
-        private const int MAX_THRESHOLD = 1024; // Maximum threshold for unknown types
-        private const int LARGE_BLOCK_THRESHOLD = 64 * 1024; // 64KB threshold for large block optimization
-
         /// <summary>
         /// Gets a value indicating that this allocator supports individual memory deallocation.
         /// </summary>
@@ -50,7 +45,7 @@ namespace ZiggyAlloc
         public HybridAllocator(IUnmanagedMemoryAllocator unmanagedAllocator)
         {
             _unmanagedAllocator = unmanagedAllocator ?? throw new ArgumentNullException(nameof(unmanagedAllocator));
-            _largeBlockAllocator = new LargeBlockAllocator(unmanagedAllocator, LARGE_BLOCK_THRESHOLD);
+            _largeBlockAllocator = new LargeBlockAllocator(unmanagedAllocator, AllocatorConstants.DefaultLargeBlockThreshold);
         }
 
         /// <summary>
@@ -87,7 +82,7 @@ namespace ZiggyAlloc
             if (useUnmanaged)
             {
                 // Check if this is a very large allocation that should use optimized large block allocation
-                if (totalSize >= LARGE_BLOCK_THRESHOLD)
+                if (totalSize >= AllocatorConstants.DefaultLargeBlockThreshold)
                 {
                     // Use optimized large block allocation
                     var buffer = _largeBlockAllocator.Allocate<T>(elementCount, zeroMemory);
@@ -178,7 +173,7 @@ namespace ZiggyAlloc
             {
                 // For unknown types, use a reasonable threshold based on element size
                 // Prevent very small thresholds for large element sizes
-                int threshold = Math.Max(MIN_THRESHOLD, Math.Min(MAX_THRESHOLD, MAX_THRESHOLD / elementSize));
+                int threshold = Math.Max(AllocatorConstants.MinThreshold, Math.Min(AllocatorConstants.MaxThreshold, AllocatorConstants.MaxThreshold / elementSize));
                 return elementCount > threshold;
             }
         }
@@ -218,23 +213,17 @@ namespace ZiggyAlloc
 
             try
             {
-                // Check if this is an aligned allocation from LargeBlockAllocator
-                // LargeBlockAllocator stores the original pointer before the aligned address
-                unsafe
+                // Try LargeBlockAllocator first (for large allocations)
+                // Use a safer approach: try to free with LargeBlockAllocator first
+                // If it throws NotSupportedException, fall back to base allocator
+                try
                 {
-                    IntPtr* header = (IntPtr*)((nuint)pointer - (nuint)sizeof(IntPtr));
-                    IntPtr originalPointer = *header;
-
-                    if (originalPointer != IntPtr.Zero)
-                    {
-                        // This was an aligned allocation from LargeBlockAllocator, free it there
-                        _largeBlockAllocator.Free(pointer);
-                    }
-                    else
-                    {
-                        // This wasn't an aligned allocation, delegate to base allocator
-                        _unmanagedAllocator.Free(pointer);
-                    }
+                    _largeBlockAllocator.Free(pointer);
+                }
+                catch (NotSupportedException)
+                {
+                    // This wasn't a LargeBlockAllocator allocation, delegate to base allocator
+                    _unmanagedAllocator.Free(pointer);
                 }
             }
             catch (Exception ex)
@@ -244,6 +233,7 @@ namespace ZiggyAlloc
                 System.Diagnostics.Debug.WriteLine($"Exception during memory cleanup in HybridAllocator.Free: {ex}");
                 #endif
                 throw; // Re-throw to maintain original behavior for compatibility
+                // ex parameter is used for debugging above
             }
         }
 
@@ -270,6 +260,7 @@ namespace ZiggyAlloc
                     System.Diagnostics.Debug.WriteLine($"Exception during LargeBlockAllocator disposal: {ex}");
 #endif
                     // Continue with disposal even if large block allocator disposal fails
+                    // ex parameter is used for debugging above
                 }
                 // The unmanaged allocator should be disposed by its owner
                 // We don't dispose it here as we don't own it

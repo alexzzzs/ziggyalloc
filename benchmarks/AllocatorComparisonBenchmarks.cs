@@ -14,22 +14,22 @@ namespace ZiggyAlloc.Benchmarks
         private const int Iterations = 1000;
 
         private SystemMemoryAllocator _systemAllocator = null!;
-        private DebugMemoryAllocator _debugAllocator = null!;
-        private ScopedMemoryAllocator _scopedAllocator = null!;
+        private DebugAllocator _debugAllocator = null!;
+        private ScopedAllocator _scopedAllocator = null!;
 
         [GlobalSetup]
         public void Setup()
         {
             _systemAllocator = new SystemMemoryAllocator();
-            _debugAllocator = new DebugMemoryAllocator("Benchmark", _systemAllocator);
-            _scopedAllocator = new ScopedMemoryAllocator();
+            _debugAllocator = new DebugAllocator("Benchmark", _systemAllocator);
+            _scopedAllocator = new ScopedAllocator();
         }
 
         [GlobalCleanup]
         public void Cleanup()
         {
             _debugAllocator.Dispose();
-            // SystemMemoryAllocator and ScopedMemoryAllocator don't need explicit cleanup
+            // SystemMemoryAllocator and ScopedAllocator don't need explicit cleanup
         }
 
         [Benchmark(Baseline = true)]
@@ -49,7 +49,7 @@ namespace ZiggyAlloc.Benchmarks
         [Benchmark]
         public void ScopedAllocator_SingleAllocation()
         {
-            using var scoped = new ScopedMemoryAllocator();
+            using var scoped = new ScopedAllocator();
             var buffer = scoped.Allocate<int>(AllocationSize);
             // No explicit dispose needed - handled by scoped allocator
         }
@@ -77,7 +77,7 @@ namespace ZiggyAlloc.Benchmarks
         [Benchmark]
         public void ScopedAllocator_MultipleAllocations()
         {
-            using var scoped = new ScopedMemoryAllocator();
+            using var scoped = new ScopedAllocator();
             for (int i = 0; i < Iterations; i++)
             {
                 var buffer = scoped.Allocate<int>(AllocationSize);

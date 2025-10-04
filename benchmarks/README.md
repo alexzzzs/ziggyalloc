@@ -21,11 +21,16 @@ The comprehensive benchmark runners support several modes for different testing 
 
 | Mode | Description | Use Case | Benchmarks Included |
 |------|-------------|----------|-------------------|
-| **all** | Run all benchmark classes | Complete performance analysis | All 10 benchmark classes |
+| **all** | Run all benchmark classes | Complete performance analysis | All 13 benchmark classes |
 | **quick** | Fast subset of benchmarks | Quick performance check | Allocation, Allocator, Pooling |
 | **experimental** | Latest optimization tests | Testing new features | ExperimentalOptimizationsBenchmarks |
 | **performance** | Performance-focused tests | Detailed performance analysis | Allocation, Multithreading, Pooling |
 | **comparison** | Compare different allocators | Choosing the right allocator | Comparison, DataType benchmarks |
+| **threading** | Threading and concurrency tests | Multi-threaded performance | Multithreading, ThreadLocalMemoryPool |
+| **memory** | Memory management tests | Pool and allocator performance | Pooling, Slab, Hybrid allocators |
+| **optimization** | Optimization feature tests | SIMD and large array performance | SIMD, LargeArray optimizations |
+| **allocators** | All allocator implementations | Comprehensive allocator testing | All allocator benchmarks |
+| **interactive** | Interactive selection mode | Custom benchmark selection | User-selected categories |
 | **specific** | Single benchmark class | Targeted testing | User-specified class |
 
 ### Benchmark Classes Overview
@@ -49,8 +54,8 @@ Compares different allocator patterns:
 ### AllocatorComparisonBenchmarks.cs
 Direct comparison between different allocator implementations:
 - SystemMemoryAllocator
-- DebugMemoryAllocator
-- ScopedMemoryAllocator
+- DebugAllocator
+- ScopedAllocator
 
 ### DataTypeBenchmarks.cs
 Performance comparison across different data types:
@@ -80,6 +85,27 @@ Benchmarks simulating real-world usage scenarios:
 
 The easiest way to run benchmarks is using the comprehensive runner scripts:
 
+#### Interactive Benchmark Selector (Easiest)
+
+For the most user-friendly experience, use the interactive benchmark selector:
+
+```powershell
+# Interactive selection mode - choose what to run
+.\select-benchmarks.ps1
+
+# Run specific category groups
+.\select-benchmarks.ps1 -Run Threading
+.\select-benchmarks.ps1 -Run "Basic,Memory"
+
+# List all available benchmarks
+.\select-benchmarks.ps1 -List
+
+# Show help
+.\select-benchmarks.ps1 -Help
+```
+
+#### Comprehensive Runner Scripts
+
 #### PowerShell (Recommended)
 ```powershell
 # Run all benchmarks
@@ -87,6 +113,18 @@ The easiest way to run benchmarks is using the comprehensive runner scripts:
 
 # Run quick benchmarks only (faster)
 .\run-benchmarks.ps1 -Mode quick
+
+# Run threading benchmarks
+.\run-benchmarks.ps1 -Mode threading
+
+# Run memory management benchmarks
+.\run-benchmarks.ps1 -Mode memory
+
+# Run optimization benchmarks
+.\run-benchmarks.ps1 -Mode optimization
+
+# Interactive benchmark selection
+.\run-benchmarks.ps1 -Mode interactive
 
 # Run experimental benchmarks
 .\run-benchmarks.ps1 -Mode experimental
@@ -168,7 +206,7 @@ dotnet run -c Release --filter *Benchmarks* --join
 | Allocator | Performance | GC Pressure | Memory Overhead | Best Use Case |
 |-----------|-------------|-------------|-----------------|---------------|
 | **SystemMemoryAllocator** | ⚡ High | ❌ None | Low | General purpose |
-| **ScopedMemoryAllocator** | ⚡⚡ Very High | ❌ None | Low | Temporary allocations |
+| **ScopedAllocator** | ⚡⚡ Very High | ❌ None | Low | Temporary allocations |
 | **UnmanagedMemoryPool** | ⚡⚡ Very High | ❌ None | Medium | Frequent allocations |
 | **HybridAllocator** | ⚡⚡ Adaptive | ⚡ Intelligent | Low | Mixed workloads |
 

@@ -19,9 +19,7 @@ namespace ZiggyAlloc
         private bool _disposed = false;
 
         // Constants for large block optimization
-        private const int DEFAULT_LARGE_BLOCK_THRESHOLD = 64 * 1024; // 64KB
         private const int MAX_POOL_SIZE = 8; // Maximum blocks to keep in pool per size class
-        private const int ALIGNMENT = 4096; // 4KB alignment for large blocks
 
         /// <summary>
         /// Gets a value indicating that this allocator supports individual memory deallocation.
@@ -38,10 +36,10 @@ namespace ZiggyAlloc
         /// </summary>
         /// <param name="baseAllocator">The underlying allocator to use for actual memory allocation</param>
         /// <param name="largeBlockThreshold">The minimum size in bytes to consider as a large block (default: 64KB)</param>
-        public LargeBlockAllocator(IUnmanagedMemoryAllocator baseAllocator, int largeBlockThreshold = DEFAULT_LARGE_BLOCK_THRESHOLD)
+        public LargeBlockAllocator(IUnmanagedMemoryAllocator baseAllocator, int largeBlockThreshold = AllocatorConstants.DefaultLargeBlockThreshold)
         {
             _baseAllocator = baseAllocator ?? throw new ArgumentNullException(nameof(baseAllocator));
-            _largeBlockThreshold = Math.Max(largeBlockThreshold, 4096); // Minimum 4KB
+            _largeBlockThreshold = Math.Max(largeBlockThreshold, AllocatorConstants.LargeBlockAlignment);
             _largeBlockPools = new ConcurrentDictionary<int, LargeBlockPool>();
         }
 
@@ -88,7 +86,7 @@ namespace ZiggyAlloc
         private unsafe UnmanagedBuffer<T> AllocateLargeBlock<T>(int elementCount, int elementSize, long totalSize, bool zeroMemory) where T : unmanaged
         {
             // Round up to alignment boundary for better performance
-            int alignedSize = (int)((totalSize + ALIGNMENT - 1) & ~(ALIGNMENT - 1));
+            int alignedSize = (int)((totalSize + AllocatorConstants.LargeBlockAlignment - 1) & ~(AllocatorConstants.LargeBlockAlignment - 1));
 
             // Try to get from pool first
             var pool = _largeBlockPools.GetOrAdd(alignedSize, _ => new LargeBlockPool(_baseAllocator, alignedSize));
@@ -119,7 +117,7 @@ namespace ZiggyAlloc
         private unsafe IntPtr AllocateAligned(int size)
         {
             // Allocate extra space for alignment
-            int extraSpace = ALIGNMENT + sizeof(IntPtr);
+            int extraSpace = AllocatorConstants.LargeBlockAlignment + sizeof(IntPtr);
             IntPtr rawPointer = (IntPtr)NativeMemory.Alloc((nuint)(size + extraSpace));
 
             if (rawPointer == IntPtr.Zero)
@@ -127,7 +125,7 @@ namespace ZiggyAlloc
 
             // Calculate aligned address
             nuint rawAddress = (nuint)rawPointer;
-            nuint alignedAddress = (rawAddress + (nuint)ALIGNMENT + (nuint)sizeof(IntPtr) - 1) & ~((nuint)ALIGNMENT - 1);
+            nuint alignedAddress = (rawAddress + (nuint)AllocatorConstants.LargeBlockAlignment + (nuint)sizeof(IntPtr) - 1) & ~((nuint)AllocatorConstants.LargeBlockAlignment - 1);
 
             // Store the original pointer before the aligned address for later freeing
             IntPtr* header = (IntPtr*)(alignedAddress - (nuint)sizeof(IntPtr));
@@ -212,6 +210,7 @@ namespace ZiggyAlloc
                 System.Diagnostics.Debug.WriteLine($"Exception during memory cleanup in LargeBlockAllocator.Free: {ex}");
 #endif
                 throw;
+                // ex parameter is used for debugging above
             }
         }
 
@@ -237,6 +236,7 @@ namespace ZiggyAlloc
                     System.Diagnostics.Debug.WriteLine($"Exception during disposal in LargeBlockAllocator.Dispose: {ex}");
 #endif
                     throw;
+                    // ex parameter is used for debugging above
                 }
             }
         }
@@ -335,6 +335,7 @@ namespace ZiggyAlloc
                         System.Diagnostics.Debug.WriteLine($"Exception during disposal in LargeBlockPool.Dispose: {ex}");
 #endif
                         throw;
+                        // ex parameter is used for debugging above
                     }
                 }
             }

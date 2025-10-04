@@ -26,7 +26,7 @@ namespace ZiggyAlloc.Tests
         [Fact]
         public void ScopedAllocator_DisposesAllAllocationsAtOnce()
         {
-            using (var scopedAllocator = new ScopedMemoryAllocator())
+            using (var scopedAllocator = new ScopedAllocator())
             {
                 // Allocate multiple buffers
                 using var buffer1 = scopedAllocator.Allocate<int>(100);
@@ -51,7 +51,7 @@ namespace ZiggyAlloc.Tests
         public void DebugAllocator_TracksAllocationLifetime()
         {
             var backend = new SystemMemoryAllocator();
-            using var debugAllocator = new DebugMemoryAllocator("Test", backend);
+            using var debugAllocator = new DebugAllocator("Test", backend);
             
             // Initially no allocations
             Assert.Equal(0, debugAllocator.GetTrackedAllocationCount());

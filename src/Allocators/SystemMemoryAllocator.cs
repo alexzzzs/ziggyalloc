@@ -91,7 +91,15 @@ namespace ZiggyAlloc
             // Optimized memory clearing based on size
             if (zeroMemory)
             {
-                ClearMemoryOptimized((void*)pointer, (int)totalSize);
+                // Use enhanced SIMD operations with prefaulting for large allocations
+                if (totalSize >= 4096) // 4KB threshold for prefaulting
+                {
+                    SimdMemoryOperations.ZeroMemoryWithPrefault((void*)pointer, (int)totalSize, prefaultPages: true);
+                }
+                else
+                {
+                    ClearMemoryOptimized((void*)pointer, (int)totalSize);
+                }
             }
 
             // Update allocation tracking
@@ -120,7 +128,7 @@ namespace ZiggyAlloc
             {
                 // Fallback to Marshal.SizeOf for non-blittable types
                 var typeHandle = type.TypeHandle;
-                return _typeSizeCache.GetOrAdd(typeHandle, handle => Marshal.SizeOf(Type.GetTypeFromHandle(handle)));
+                return _typeSizeCache.GetOrAdd(typeHandle, handle => Marshal.SizeOf(Type.GetTypeFromHandle(handle)!));
             }
             else
             {
@@ -196,6 +204,8 @@ namespace ZiggyAlloc
                 {
                     throw; // Re-throw to maintain original behavior for compatibility on other platforms
                 }
+                // On ARM64, suppress the exception to prevent test host crashes
+                // ex parameter is used for debugging above
             }
         }
 
