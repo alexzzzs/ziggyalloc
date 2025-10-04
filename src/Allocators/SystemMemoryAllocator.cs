@@ -91,7 +91,15 @@ namespace ZiggyAlloc
             // Optimized memory clearing based on size
             if (zeroMemory)
             {
-                ClearMemoryOptimized((void*)pointer, (int)totalSize);
+                // Use enhanced SIMD operations with prefaulting for large allocations
+                if (totalSize >= 4096) // 4KB threshold for prefaulting
+                {
+                    SimdMemoryOperations.ZeroMemoryWithPrefault((void*)pointer, (int)totalSize, prefaultPages: true);
+                }
+                else
+                {
+                    ClearMemoryOptimized((void*)pointer, (int)totalSize);
+                }
             }
 
             // Update allocation tracking

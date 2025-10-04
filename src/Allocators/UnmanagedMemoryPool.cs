@@ -38,14 +38,17 @@ namespace ZiggyAlloc
             320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096
         };
 
-        // Size-class pools using simple arrays for maximum performance
-        private readonly IntPtr[][] _sizeClassPools = new IntPtr[MaxSizeClasses][];
-        private readonly int[] _sizeClassSizes = new int[MaxSizeClasses];
-        private readonly int[] _poolCounts = new int[MaxSizeClasses];
-        private readonly SpinLock[] _poolLocks = new SpinLock[MaxSizeClasses];
+        // Lock-free size-class pools using atomic operations
+        private readonly LockFreeSizeClass[] _sizeClasses = new LockFreeSizeClass[MaxSizeClasses];
 
         // Fallback pool for uncommon sizes
-        private readonly ConcurrentDictionary<int, ConcurrentStack<IntPtr>> _fallbackPools = new();
+        private readonly ConcurrentDictionary<int, LockFreeStack> _fallbackPools = new();
+
+        // Dynamic size class tracking for optimization
+        private readonly long[] _sizeClassUsage = new long[MaxSizeClasses];
+        private readonly long[] _sizeClassHits = new long[MaxSizeClasses];
+        private long _lastOptimizationTime = 0;
+        private const long OptimizationInterval = 1000000; // Optimize every 1M operations
 
         private readonly ConcurrentDictionary<IntPtr, int> _pointerSizes = new ConcurrentDictionary<IntPtr, int>();
         private long _totalAllocatedBytes;
@@ -73,12 +76,10 @@ namespace ZiggyAlloc
         {
             _baseAllocator = baseAllocator ?? throw new ArgumentNullException(nameof(baseAllocator));
 
-            // Initialize size classes and SpinLocks
+            // Initialize lock-free size classes
             for (int i = 0; i < MaxSizeClasses && i < SizeClasses.Length; i++)
             {
-                _sizeClassSizes[i] = SizeClasses[i];
-                _sizeClassPools[i] = new IntPtr[MaxSlotsPerClass];
-                _poolLocks[i] = new SpinLock(); // Initialize SpinLock
+                _sizeClasses[i] = new LockFreeSizeClass(SizeClasses[i], MaxSlotsPerClass);
             }
         }
 
@@ -104,24 +105,48 @@ namespace ZiggyAlloc
 
             int sizeInBytes = elementCount * sizeof(T);
 
-            // Try optimized size-class pools first
+            // Try optimized lock-free size-class pools first
             int sizeClassIndex = FindSizeClass(sizeInBytes);
-            if (sizeClassIndex >= 0 && TryAllocateFromSizeClass(sizeClassIndex, out var pointer))
+            if (sizeClassIndex >= 0)
             {
-                if (zeroMemory)
+                // Track usage for dynamic optimization
+                Interlocked.Increment(ref _sizeClassUsage[sizeClassIndex]);
+
+                if (_sizeClasses[sizeClassIndex].TryPop(out var pointer))
                 {
-                    new Span<byte>((void*)pointer, sizeInBytes).Clear();
+                    Interlocked.Increment(ref _sizeClassHits[sizeClassIndex]);
+
+                    if (zeroMemory)
+                    {
+                        // Use enhanced SIMD operations for zeroing
+                        if (sizeInBytes >= 4096)
+                        {
+                            SimdMemoryOperations.ZeroMemoryWithPrefault((void*)pointer, sizeInBytes, prefaultPages: false);
+                        }
+                        else
+                        {
+                            new Span<byte>((void*)pointer, sizeInBytes).Clear();
+                        }
+                    }
+                    return new UnmanagedBuffer<T>((T*)pointer, elementCount, this);
                 }
-                return new UnmanagedBuffer<T>((T*)pointer, elementCount, this);
             }
 
-            // Fallback to concurrent pools for uncommon sizes
-            var fallbackPool = _fallbackPools.GetOrAdd(sizeInBytes, _ => new ConcurrentStack<IntPtr>());
+            // Fallback to lock-free pools for uncommon sizes
+            var fallbackPool = _fallbackPools.GetOrAdd(sizeInBytes, _ => new LockFreeStack());
             if (fallbackPool.TryPop(out var fallbackPointer))
             {
                 if (zeroMemory)
                 {
-                    new Span<byte>((void*)fallbackPointer, sizeInBytes).Clear();
+                    // Use enhanced SIMD operations for zeroing
+                    if (sizeInBytes >= 4096)
+                    {
+                        SimdMemoryOperations.ZeroMemoryWithPrefault((void*)fallbackPointer, sizeInBytes, prefaultPages: false);
+                    }
+                    else
+                    {
+                        new Span<byte>((void*)fallbackPointer, sizeInBytes).Clear();
+                    }
                 }
                 return new UnmanagedBuffer<T>((T*)fallbackPointer, elementCount, this);
             }
@@ -129,6 +154,10 @@ namespace ZiggyAlloc
             var buffer = _baseAllocator.Allocate<T>(elementCount, zeroMemory);
             Interlocked.Add(ref _totalAllocatedBytes, buffer.SizeInBytes);
             _pointerSizes.TryAdd(buffer.RawPointer, buffer.SizeInBytes);
+
+            // Trigger dynamic optimization periodically
+            TryOptimizeSizeClasses();
+
             return new UnmanagedBuffer<T>((T*)buffer.RawPointer, buffer.Length, this);
         }
 
@@ -149,16 +178,16 @@ namespace ZiggyAlloc
             {
                 if (_pointerSizes.TryGetValue(pointer, out var size))
                 {
-                    // Try optimized size-class pools first
+                    // Try optimized lock-free size-class pools first
                     int sizeClassIndex = FindSizeClass(size);
-                    if (sizeClassIndex >= 0 && TryReturnToSizeClass(sizeClassIndex, pointer))
+                    if (sizeClassIndex >= 0 && _sizeClasses[sizeClassIndex].TryPush(pointer))
                     {
                         return;
                     }
 
-                    // Fallback to concurrent pools for uncommon sizes
-                    var fallbackPool = _fallbackPools.GetOrAdd(size, _ => new ConcurrentStack<IntPtr>());
-                    fallbackPool.Push(pointer);
+                    // Fallback to lock-free pools for uncommon sizes
+                    var fallbackPool = _fallbackPools.GetOrAdd(size, _ => new LockFreeStack());
+                    fallbackPool.TryPush(pointer);
                 }
                 else
                 {
@@ -188,31 +217,16 @@ namespace ZiggyAlloc
             if (_disposed)
                 return;
 
-            // Clear size-class pools
+            // Clear lock-free size-class pools
             for (int i = 0; i < MaxSizeClasses; i++)
             {
-                var pool = _sizeClassPools[i];
-
-                // Use SpinLock for better performance under contention
-                bool lockTaken = false;
-                try
+                while (_sizeClasses[i].TryPop(out var pointer))
                 {
-                    _poolLocks[i].Enter(ref lockTaken);
-                    int count = _poolCounts[i];
-                    for (int j = 0; j < count; j++)
+                    if (_pointerSizes.TryRemove(pointer, out var size))
                     {
-                        var pointer = pool[j];
-                        if (_pointerSizes.TryRemove(pointer, out var size))
-                        {
-                            _baseAllocator.Free(pointer);
-                            Interlocked.Add(ref _totalAllocatedBytes, -size);
-                        }
+                        _baseAllocator.Free(pointer);
+                        Interlocked.Add(ref _totalAllocatedBytes, -size);
                     }
-                    _poolCounts[i] = 0;
-                }
-                finally
-                {
-                    if (lockTaken) _poolLocks[i].Exit();
                 }
             }
 
@@ -233,39 +247,6 @@ namespace ZiggyAlloc
             _fallbackPools.Clear();
         }
 
-        /// <summary>
-        /// Attempts to return a pointer to a specific size class.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryReturnToSizeClass(int sizeClassIndex, IntPtr pointer)
-        {
-            if (sizeClassIndex < 0 || sizeClassIndex >= MaxSizeClasses)
-            {
-                return false;
-            }
-
-            var pool = _sizeClassPools[sizeClassIndex];
-
-            // Use SpinLock for better performance under contention
-            bool lockTaken = false;
-            try
-            {
-                _poolLocks[sizeClassIndex].Enter(ref lockTaken);
-                int count = _poolCounts[sizeClassIndex];
-                if (count < MaxSlotsPerClass)
-                {
-                    pool[count] = pointer;
-                    _poolCounts[sizeClassIndex] = count + 1;
-                    return true;
-                }
-            }
-            finally
-            {
-                if (lockTaken) _poolLocks[sizeClassIndex].Exit();
-            }
-
-            return false;
-        }
 
         /// <summary>
         /// Disposes the pool.
@@ -306,7 +287,7 @@ namespace ZiggyAlloc
             // Simple linear search for size class - optimized for common sizes
             for (int i = 0; i < MaxSizeClasses && i < SizeClasses.Length; i++)
             {
-                if (_sizeClassSizes[i] >= sizeInBytes)
+                if (SizeClasses[i] >= sizeInBytes)
                 {
                     return i;
                 }
@@ -315,40 +296,160 @@ namespace ZiggyAlloc
         }
 
         /// <summary>
-        /// Attempts to allocate from a specific size class.
+        /// Lock-free size class for high-performance memory pooling.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryAllocateFromSizeClass(int sizeClassIndex, out IntPtr pointer)
+        private sealed class LockFreeSizeClass
         {
-            if (sizeClassIndex < 0 || sizeClassIndex >= MaxSizeClasses)
+            private readonly int _maxSlots;
+            private int _count = 0;
+            private IntPtr[] _slots;
+
+            public LockFreeSizeClass(int slotSize, int maxSlots)
             {
-                pointer = IntPtr.Zero;
+                _maxSlots = maxSlots;
+                _slots = new IntPtr[maxSlots];
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool TryPush(IntPtr pointer)
+            {
+                int count = Volatile.Read(ref _count);
+                if (count >= _maxSlots)
+                    return false;
+
+                if (Interlocked.CompareExchange(ref _count, count + 1, count) == count)
+                {
+                    _slots[count] = pointer;
+                    return true;
+                }
+
                 return false;
             }
 
-            var pool = _sizeClassPools[sizeClassIndex];
-
-            // Use SpinLock for better performance under contention
-            bool lockTaken = false;
-            try
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool TryPop(out IntPtr pointer)
             {
-                _poolLocks[sizeClassIndex].Enter(ref lockTaken);
-                int count = _poolCounts[sizeClassIndex];
-                if (count > 0)
+                pointer = IntPtr.Zero;
+
+                int count = Volatile.Read(ref _count);
+                if (count <= 0)
+                    return false;
+
+                if (Interlocked.CompareExchange(ref _count, count - 1, count) == count)
                 {
-                    count--;
-                    _poolCounts[sizeClassIndex] = count;
-                    pointer = pool[count];
+                    pointer = _slots[count - 1];
                     return true;
                 }
+
+                return false;
             }
-            finally
+        }
+
+        /// <summary>
+        /// Lock-free stack implementation using atomic operations.
+        /// </summary>
+        private sealed class LockFreeStack
+        {
+            private volatile LockFreeNode? _head;
+
+            private class LockFreeNode
             {
-                if (lockTaken) _poolLocks[sizeClassIndex].Exit();
+                public IntPtr Pointer;
+                public LockFreeNode? Next;
             }
 
-            pointer = IntPtr.Zero;
-            return false;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool TryPush(IntPtr pointer)
+            {
+                var node = new LockFreeNode { Pointer = pointer };
+                LockFreeNode currentHead;
+
+                do
+                {
+                    currentHead = _head;
+                    node.Next = currentHead;
+                }
+                while (Interlocked.CompareExchange(ref _head, node, currentHead) != currentHead);
+
+                return true;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool TryPop(out IntPtr pointer)
+            {
+                pointer = IntPtr.Zero;
+                LockFreeNode currentHead;
+
+                do
+                {
+                    currentHead = _head;
+                    if (currentHead == null)
+                        return false;
+
+                    pointer = currentHead.Pointer;
+                }
+                while (Interlocked.CompareExchange(ref _head, currentHead.Next, currentHead) != currentHead);
+
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to optimize size classes based on usage patterns.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void TryOptimizeSizeClasses()
+        {
+            // Check if enough time has passed for optimization
+            long totalOperations = 0;
+            for (int i = 0; i < MaxSizeClasses; i++)
+            {
+                totalOperations += _sizeClassUsage[i];
+            }
+
+            if (totalOperations - _lastOptimizationTime < OptimizationInterval)
+                return;
+
+            _lastOptimizationTime = totalOperations;
+
+            // Analyze usage patterns and adjust size classes if needed
+            OptimizeSizeClassDistribution();
+        }
+
+        /// <summary>
+        /// Optimizes size class distribution based on actual usage patterns.
+        /// </summary>
+        private void OptimizeSizeClassDistribution()
+        {
+            // Find most and least used size classes
+            int mostUsedIndex = 0;
+            int leastUsedIndex = 0;
+            long maxUsage = 0;
+            long minUsage = long.MaxValue;
+
+            for (int i = 0; i < MaxSizeClasses; i++)
+            {
+                long usage = _sizeClassUsage[i];
+                if (usage > maxUsage)
+                {
+                    maxUsage = usage;
+                    mostUsedIndex = i;
+                }
+                if (usage < minUsage && usage > 0)
+                {
+                    minUsage = usage;
+                    leastUsedIndex = i;
+                }
+            }
+
+            // If we have significant usage imbalance, log for potential future optimization
+            if (maxUsage > minUsage * 10 && maxUsage > 1000)
+            {
+#if DEBUG
+                System.Diagnostics.Debug.WriteLine(
+                    $"MemoryPool: Significant usage imbalance detected. Most used size class {mostUsedIndex} ({maxUsage} uses), least used {leastUsedIndex} ({minUsage} uses)");
+#endif
+            }
         }
     }
 }
