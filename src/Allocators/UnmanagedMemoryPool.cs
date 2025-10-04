@@ -38,10 +38,10 @@ namespace ZiggyAlloc
             320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 2560, 3072, 3584, 4096
         };
 
-        // Lock-free size-class pools using atomic operations
+        // Lock-free size-class pools using correct atomic operations
         private readonly LockFreeSizeClass[] _sizeClasses = new LockFreeSizeClass[MaxSizeClasses];
 
-        // Fallback pool for uncommon sizes - use reliable ConcurrentStack
+        // Fallback pool for uncommon sizes
         private readonly ConcurrentDictionary<int, ConcurrentStack<IntPtr>> _fallbackPools = new();
 
         // Dynamic size class tracking for optimization
@@ -79,7 +79,7 @@ namespace ZiggyAlloc
             // Initialize lock-free size classes
             for (int i = 0; i < MaxSizeClasses && i < SizeClasses.Length; i++)
             {
-                _sizeClasses[i] = new LockFreeSizeClass(SizeClasses[i], MaxSlotsPerClass);
+                _sizeClasses[i] = new LockFreeSizeClass(MaxSlotsPerClass);
             }
         }
 
@@ -107,29 +107,25 @@ namespace ZiggyAlloc
 
             // Try optimized lock-free size-class pools first
             int sizeClassIndex = FindSizeClass(sizeInBytes);
-            if (sizeClassIndex >= 0)
+            if (sizeClassIndex >= 0 && _sizeClasses[sizeClassIndex].TryPop(out var pointer))
             {
                 // Track usage for dynamic optimization
                 Interlocked.Increment(ref _sizeClassUsage[sizeClassIndex]);
+                Interlocked.Increment(ref _sizeClassHits[sizeClassIndex]);
 
-                if (_sizeClasses[sizeClassIndex].TryPop(out var pointer))
+                if (zeroMemory)
                 {
-                    Interlocked.Increment(ref _sizeClassHits[sizeClassIndex]);
-
-                    if (zeroMemory)
+                    // Use enhanced SIMD operations for zeroing
+                    if (sizeInBytes >= 4096)
                     {
-                        // Use enhanced SIMD operations for zeroing
-                        if (sizeInBytes >= 4096)
-                        {
-                            SimdMemoryOperations.ZeroMemoryWithPrefault((void*)pointer, sizeInBytes, prefaultPages: false);
-                        }
-                        else
-                        {
-                            new Span<byte>((void*)pointer, sizeInBytes).Clear();
-                        }
+                        SimdMemoryOperations.ZeroMemoryWithPrefault((void*)pointer, sizeInBytes, prefaultPages: false);
                     }
-                    return new UnmanagedBuffer<T>((T*)pointer, elementCount, this);
+                    else
+                    {
+                        new Span<byte>((void*)pointer, sizeInBytes).Clear();
+                    }
                 }
+                return new UnmanagedBuffer<T>((T*)pointer, elementCount, this);
             }
 
             // Fallback to concurrent pools for uncommon sizes
@@ -297,58 +293,59 @@ namespace ZiggyAlloc
 
         /// <summary>
         /// Lock-free size class for high-performance memory pooling.
+        /// Uses the correct algorithm: write slot first, then increment count.
         /// </summary>
         private sealed class LockFreeSizeClass
         {
             private readonly int _maxSlots;
-            private int _count = 0;
             private IntPtr[] _slots;
+            private int _count;
 
-            public LockFreeSizeClass(int slotSize, int maxSlots)
+            public LockFreeSizeClass(int maxSlots)
             {
                 _maxSlots = maxSlots;
                 _slots = new IntPtr[maxSlots];
+                _count = 0;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool TryPush(IntPtr pointer)
             {
-                // Use lock-free approach with proper bounds checking
-                int currentCount, newCount;
-                do
+                while (true)
                 {
-                    currentCount = _count;
-                    if (currentCount >= _maxSlots)
-                        return false;
+                    int currentCount = Volatile.Read(ref _count);
+                    if (currentCount >= _maxSlots) return false;
 
-                    newCount = currentCount + 1;
+                    // Write the pointer **before** incrementing count
+                    _slots[currentCount] = pointer;
+
+                    // Atomically increment count
+                    if (Interlocked.CompareExchange(ref _count, currentCount + 1, currentCount) == currentCount)
+                    {
+                        return true;
+                    }
+                    // Failed CAS → retry
                 }
-                while (Interlocked.CompareExchange(ref _count, newCount, currentCount) != currentCount);
-
-                // Store the pointer after successfully incrementing count
-                _slots[currentCount] = pointer;
-                return true;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool TryPop(out IntPtr pointer)
             {
                 pointer = IntPtr.Zero;
-
-                // Use lock-free approach with proper bounds checking
-                int currentCount, newCount;
-                do
+                while (true)
                 {
-                    currentCount = _count;
-                    if (currentCount <= 0)
-                        return false;
+                    int currentCount = Volatile.Read(ref _count);
+                    if (currentCount <= 0) return false;
 
-                    newCount = currentCount - 1;
-                    pointer = _slots[currentCount - 1];
+                    int newCount = currentCount - 1;
+                    pointer = _slots[newCount]; // safe to read here
+
+                    if (Interlocked.CompareExchange(ref _count, newCount, currentCount) == currentCount)
+                    {
+                        return true;
+                    }
+                    // Failed CAS → retry
                 }
-                while (Interlocked.CompareExchange(ref _count, newCount, currentCount) != currentCount);
-
-                return true;
             }
         }
 

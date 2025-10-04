@@ -9,7 +9,7 @@ namespace ZiggyAlloc.Benchmarks
     /// <summary>
     /// Benchmarks for the AlignedAllocator to measure performance improvements from memory alignment.
     /// </summary>
-    [SimpleJob(RunStrategy.ColdStart, targetCount: 5)]
+    [SimpleJob(RunStrategy.ColdStart)]
     [MinColumn, MaxColumn, MeanColumn, MedianColumn]
     [MemoryDiagnoser]
     [ThreadingDiagnoser]

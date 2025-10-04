@@ -8,7 +8,7 @@ namespace ZiggyAlloc.Benchmarks
     /// <summary>
     /// Benchmarks for the NUMA-aware allocator to measure performance improvements on multi-socket systems.
     /// </summary>
-    [SimpleJob(RunStrategy.ColdStart, targetCount: 5)]
+    [SimpleJob(RunStrategy.ColdStart)]
     [MinColumn, MaxColumn, MeanColumn, MedianColumn]
     [MemoryDiagnoser]
     [ThreadingDiagnoser]
