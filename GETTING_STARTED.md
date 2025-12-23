@@ -79,7 +79,7 @@ Buffer info:
   Pointer: 0x1A2B3C4D5E6F
 ```
 
-## 🧠 Core Concepts
+## Core Concepts
 
 ### Memory Allocators
 
@@ -256,7 +256,7 @@ defer.Defer(() => alloc.Free(ptrCopy));
 
 Need help? Check the [GitHub issues](https://github.com/ziggyalloc/ziggyalloc/issues) or create a new one!
 
-## 🚀 Advanced Features
+## Advanced Features
 
 ### Memory Pooling
 

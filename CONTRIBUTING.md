@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to ZiggyAlloc! We welcome contributions from the community.
 
-## 🚀 Quick Start
+## Quick Start
 
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally
@@ -11,31 +11,31 @@ Thank you for your interest in contributing to ZiggyAlloc! We welcome contributi
 5. **Test** your changes
 6. **Submit** a pull request
 
-## 📋 Ways to Contribute
+## Ways to Contribute
 
-### 🐛 Bug Reports
+### Bug Reports
 - Use GitHub Issues to report bugs
 - Include minimal reproduction steps
 - Specify your .NET version and platform
 - Check if the issue already exists
 
-### 💡 Feature Requests
+### Feature Requests
 - Open a GitHub Issue with the "enhancement" label
 - Describe the use case and expected behavior
 - Discuss the design before implementing
 
-### 🔧 Code Contributions
+### Code Contributions
 - Fix bugs or implement new features
 - Follow the coding standards below
 - Add tests for new functionality
 - Update documentation as needed
 
-### 📚 Documentation
+### Documentation
 - Improve README, examples, or API docs
 - Fix typos or unclear explanations
 - Add usage examples or tutorials
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### Prerequisites
 - .NET 8.0 SDK or later
@@ -58,7 +58,7 @@ dotnet test
 dotnet run --project examples/
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Running Tests
 ```bash
@@ -78,7 +78,7 @@ dotnet test --filter "ClassName=AllocatorTests"
 - Test both success and failure cases
 - Include memory leak detection tests for allocators
 
-## 📝 Coding Standards
+## Coding Standards
 
 ### General Guidelines
 - Follow C# naming conventions
@@ -98,7 +98,7 @@ dotnet test --filter "ClassName=AllocatorTests"
 - Avoid allocations in performance-critical code
 - Benchmark significant changes
 
-## 🔄 Pull Request Process
+## Pull Request Process
 
 ### Before Submitting
 1. **Create an issue** first for significant changes
@@ -120,7 +120,7 @@ dotnet test --filter "ClassName=AllocatorTests"
 3. Once approved, maintainers will merge
 4. Your contribution will be in the next release!
 
-## 🏷️ Issue Labels
+## Issue Labels
 
 - `bug` - Something isn't working
 - `enhancement` - New feature or improvement
@@ -130,7 +130,7 @@ dotnet test --filter "ClassName=AllocatorTests"
 - `performance` - Performance-related changes
 - `breaking change` - Would break existing code
 
-## 📊 Release Process
+## Release Process
 
 ### Versioning
 We follow [Semantic Versioning](https://semver.org/):
@@ -166,7 +166,7 @@ We follow [Semantic Versioning](https://semver.org/):
 - Maintainers handle the release process
 - See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development workflow
 
-## 🤝 Code of Conduct
+## Code of Conduct
 
 ### Our Standards
 - Be respectful and inclusive
@@ -180,17 +180,16 @@ We follow [Semantic Versioning](https://semver.org/):
 - Personal attacks
 - Publishing private information
 
-## 💬 Getting Help
+## Getting Help
 
 - **GitHub Issues**: For bugs and feature requests
 - **GitHub Discussions**: For questions and general discussion
 - **Code Review**: Ask questions in PR comments
 
-## 🎉 Recognition
+## Recognition
 
 Contributors will be:
 - Listed in the project README
 - Mentioned in release notes
-- Given credit in the NuGet package metadata
 
-Thank you for helping make ZiggyAlloc better! 🚀
+

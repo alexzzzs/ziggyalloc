@@ -6,7 +6,7 @@
 2. [Core Concepts](#core-concepts)
 3. [Memory Allocators](#memory-allocators)
 4. [UnmanagedBuffer<T>](#unmanagedbuffert)
-5. [Memory Safety](#memory-safety)
+5. [Safety Model](#safety-model)
 6. [API Reference](#api-reference)
 7. [Best Practices](#best-practices)
 8. [Performance Considerations](#performance-considerations)
@@ -14,17 +14,19 @@
 
 ## Overview
 
-ZiggyAlloc is a high-performance C# library for unmanaged memory management. It provides explicit control over memory allocation while maintaining safety through well-designed abstractions and automatic cleanup mechanisms.
+ZiggyAlloc is an unmanaged memory library for .NET. It provides explicit allocation strategies for code where GC behavior is unacceptable or unpredictable.
+
+ZiggyAlloc prioritizes explicit lifetimes and predictable behavior over convenience.
 
 ### Key Features
 
-- **High-Performance Memory Management**: Direct access to native memory allocation
-- **Multiple Allocator Strategies**: System, scoped, debug, pool, hybrid, slab, and large block allocators
-- **Type-Safe Memory Access**: `UnmanagedBuffer<T>` with bounds checking
-- **Memory Safety**: Leak detection, bounds checking, and automatic cleanup
-- **RAII Support**: Automatic cleanup using `using` statements
-- **Span<T> Integration**: Zero-cost conversion to high-performance spans
-- **Native Interop**: Direct pointer access for native API calls
+- Direct access to native memory allocation
+- Multiple allocator strategies: System, Scoped, Debug, Pool, Hybrid, Slab, Large Block, NUMA-aware, and Aligned
+- Type-safe memory access with bounds checking
+- Leak detection and automatic cleanup
+- RAII support with `using` statements
+- Zero-cost conversion to `Span<T>`
+- Direct pointer access for native API calls
 
 ## Core Concepts
 
@@ -67,31 +69,42 @@ ZiggyAlloc uses RAII principles for deterministic cleanup:
 - **Scoped allocators**: All allocations freed when allocator is disposed
 - **Debug tracking**: Leak detection with caller information
 
+## Safety Model
+
+Memory is unmanaged and not tracked by the GC.
+
+Bounds checking is provided by UnmanagedBuffer<T>.
+
+Use-after-dispose is undefined behavior.
+
+Thread safety depends on allocator choice.
+
 ## Memory Allocators
 
-### SystemMemoryAllocator
+### Core Allocators
 
-High-performance allocator using native system calls.
+#### SystemMemoryAllocator
+
+Direct system memory allocation with tracking.
 
 ```csharp
 var allocator = new SystemMemoryAllocator();
 using var buffer = allocator.Allocate<int>(100, zeroMemory: true);
 
 // Use buffer...
-// Memory automatically freed when buffer is disposed
+// Memory freed when buffer is disposed
 
 Console.WriteLine($"Total allocated: {allocator.TotalAllocatedBytes} bytes");
 ```
 
 **Use Cases:**
-- General-purpose unmanaged memory allocation
-- Performance-critical code
+- General unmanaged memory allocation
 - Long-lived allocations
 - Native API interop
 
-**Thread Safety:** ✅ Thread-safe
+**Thread Safety:** Yes
 
-### ScopedMemoryAllocator
+#### ScopedAllocator
 
 Automatically frees all allocations when disposed.
 
@@ -108,9 +121,9 @@ using var buffer2 = allocator.Allocate<double>(100);
 - Arena-style allocation patterns
 - When you want automatic cleanup of multiple allocations
 
-**Thread Safety:** ❌ Not thread-safe (use separate instances per thread)
+**Thread Safety:** No (use separate instances per thread)
 
-### DebugMemoryAllocator
+### DebugAllocator
 
 Tracks allocations and detects memory leaks with caller information.
 
@@ -353,6 +366,20 @@ Console.WriteLine($"CPU features: {stats.CpuArchitecture}");
 - **ARM**: NEON and SVE detection and optimization
 - **Cloud Platforms**: Automatic optimization for cloud instance types
 
+### Allocator Comparison
+
+| Allocator | Use Cases | Thread Safe | Key Benefits |
+|-----------|-----------|-------------|--------------|
+| **SystemMemoryAllocator** | General unmanaged allocations, native interop | ✅ | Direct system calls, long-lived allocations |
+| **ScopedAllocator** | Temporary allocations, arena patterns | ❌ | Automatic cleanup of all allocations |
+| **DebugAllocator** | Development/testing, memory leak detection | ✅ | Leak detection with caller information |
+| **UnmanagedMemoryPool** | Frequent allocations of similar sizes | ✅ | Reduces P/Invoke overhead, eliminates GC pressure |
+| **HybridAllocator** | Mixed workloads, various data types/sizes | ✅ | Chooses managed/unmanaged automatically based on benchmarks |
+| **SlabAllocator** | High-frequency small allocations | ✅ | Extremely fast allocation, zero fragmentation |
+| **LargeBlockAllocator** | Large memory blocks (>64KB) | ✅ | Memory pooling, 4KB alignment, SIMD integration |
+| **NumaAwareAllocator** | Multi-socket systems, HPC applications | ✅ | 20-40% performance improvement on NUMA systems |
+| **AlignedAllocator** | SIMD workloads, memory-intensive apps | ✅ | 10-30% faster SIMD operations, hardware optimization |
+
 ## SIMD Memory Operations
 
 Hardware-accelerated memory operations with revolutionary performance gains:
@@ -380,11 +407,20 @@ largeBuffer.CopyTo(destBuffer); // Uses SimdMemoryOperations.CopyMemory
 - **Automatic Fallback**: Graceful degradation for older hardware
 - **Zero Configuration**: Works out-of-the-box with all allocators
 
-**Performance Results:**
-- **ZeroMemory**: 15x faster (1KB), 26x faster (16KB), 29x faster (64KB)
-- **CopyMemory**: 7x faster (1KB), 8x faster (16KB), 5.5x faster (64KB)
-- **Hardware Detection**: Automatic AVX2/SIMD/fallback selection based on CPU capabilities
-- **Integration**: LargeBlockAllocator uses SIMD operations for optimal performance
+### Performance Summary Table
+
+| Operation | Standard | SIMD Optimized | Speedup |
+|-----------|----------|----------------|---------|
+| **ZeroMemory 1KB** | baseline | AVX2 | 15x |
+| **ZeroMemory 16KB** | baseline | AVX2 | 26x |
+| **ZeroMemory 64KB** | baseline | AVX2 | 29x |
+| **CopyMemory 1KB** | baseline | AVX2 | 7x |
+| **CopyMemory 16KB** | baseline | AVX2 | 8x |
+| **CopyMemory 64KB** | baseline | AVX2 | 5.5x |
+| **Clear 64KB** | baseline | AVX2 | 29x |
+
+**Hardware Detection**: Automatic AVX2/SIMD/fallback selection based on CPU capabilities
+**Integration**: LargeBlockAllocator uses SIMD operations for optimal performance
 
 **Advanced Optimizations:**
 - **20-55% faster allocation** through `Unsafe.SizeOf<T>()` and optimized calculations
@@ -445,60 +481,15 @@ buffer.CopyFrom(source);  // Copy from another buffer/span
 - `void CopyFrom(ReadOnlySpan<T> source)` - Copy from span
 - `void Dispose()` - Free memory if owned
 
-## Memory Safety
+## Safety Model
 
-ZiggyAlloc provides multiple layers of memory safety without sacrificing performance:
+Memory is unmanaged and not tracked by the GC.
 
-### Bounds Checking
+Bounds checking is provided by UnmanagedBuffer<T>.
 
-All buffer access is bounds-checked to prevent buffer overruns:
+Use-after-dispose is undefined behavior.
 
-```csharp
-using var buffer = allocator.Allocate<int>(10);
-
-try 
-{
-    buffer[15] = 42; // Throws IndexOutOfRangeException
-}
-catch (IndexOutOfRangeException ex)
-{
-    Console.WriteLine($"Bounds check prevented buffer overrun: {ex.Message}");
-}
-```
-
-### Automatic Cleanup
-
-Buffers integrate with `using` statements for deterministic cleanup:
-
-```csharp
-using var buffer = allocator.Allocate<byte>(1024);
-// Memory automatically freed when buffer goes out of scope
-// No manual Free() calls needed
-```
-
-### Leak Detection
-
-Debug allocator tracks allocations and reports leaks with caller information:
-
-```csharp
-using var debugAlloc = new DebugAllocator("Test", Z.DefaultAllocator,
-    MemoryLeakReportingMode.Throw);
-
-var buffer = debugAlloc.Allocate<int>(10);
-// Forgot to dispose - will throw with file/line information
-```
-
-### Type Safety
-
-Generic constraints ensure only unmanaged types can be allocated:
-
-```csharp
-// ✅ Valid - int is unmanaged
-using var intBuffer = allocator.Allocate<int>(100);
-
-// ❌ Compile error - string is managed
-// using var stringBuffer = allocator.Allocate<string>(100);
-```
+Thread safety depends on allocator choice.
 
 ## API Reference
 
@@ -1046,4 +1037,16 @@ public void CallNativeFunction(AllocationContext context)
 
 ---
 
+All examples are in the examples/ folder. Each allocator has a dedicated example file demonstrating real-world usage.
+
 For more examples and advanced usage patterns, see the [examples](examples/) directory and [GETTING_STARTED.md](GETTING_STARTED.md).
+
+## When Not to Use ZiggyAlloc
+
+ZiggyAlloc is designed for specific high-performance scenarios. Consider alternatives when:
+
+- **GC behavior is acceptable**: For applications where garbage collection pauses are not a concern
+- **Simple applications**: For straightforward programs that don't need explicit memory control
+- **Managed memory suffices**: When the performance benefits of unmanaged memory don't outweigh the complexity
+
+**Requirements**: .NET 8+ with unsafe code enabled.

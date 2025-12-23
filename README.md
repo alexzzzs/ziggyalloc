@@ -1,68 +1,84 @@
+
 # ZiggyAlloc
 
-High-performance unmanaged memory management for .NET with explicit control and zero GC pressure.
+ZiggyAlloc is an unmanaged memory library for .NET.
+It provides explicit allocation strategies for code where GC behavior is unacceptable or unpredictable.
+
+ZiggyAlloc prioritizes explicit lifetimes and predictable behavior over convenience.
 
 [![NuGet](https://img.shields.io/nuget/v/ZiggyAlloc.svg)](https://www.nuget.org/packages/ZiggyAlloc/)
 [![Build Status](https://github.com/alexzzzs/ziggyalloc/workflows/CI/badge.svg)](https://github.com/alexzzzs/ziggyalloc/actions)
 [![License](https://img.shields.io/github/license/alexzzzs/ziggyalloc)](LICENSE)
 
-## Overview
+---
 
-ZiggyAlloc is a high-performance C# library for unmanaged memory management. It provides explicit control over memory allocation while maintaining safety through well-designed abstractions and automatic cleanup mechanisms.
+## Non-Goals
 
-### Key Features
+ZiggyAlloc does not:
 
-- **High-Performance Memory Management**: Direct access to native memory allocation
-- **SIMD Memory Operations**: Hardware-accelerated memory clearing and copying with 5-29x performance gains
-- **Multiple Allocator Strategies**: System, scoped, debug, pool, hybrid, slab, large block, NUMA-aware, and alignment-optimized allocators
-- **Type-Safe Memory Access**: `UnmanagedBuffer<T>` with bounds checking
-- **Memory Safety**: Leak detection, bounds checking, and automatic cleanup
-- **RAII Support**: Automatic cleanup using `using` statements
-- **Span<T> Integration**: Zero-cost conversion to high-performance spans
-- **Native Interop**: Direct pointer access for native API calls
-- **Hardware Optimization**: AVX2 acceleration with automatic fallback for older hardware
+* Replace the .NET GC
+* Provide general-purpose allocation
+* Offer transparent thread safety
+* Perform automatic lifetime inference
+* Make unsafe code safe
 
-## ✨ Recently Added
+---
+
+## Key Features
+
+* Explicit allocator types with defined lifetimes
+* Direct unmanaged memory access
+* Type-safe buffers with bounds checking
+* Deterministic cleanup via `IDisposable`
+* Zero-copy conversion to `Span<T>`
+* Optional pooling and reuse
+* Optional debug tracking and leak detection
+* Optional alignment and NUMA-aware allocation
+
+---
+
+## How to Think About ZiggyAlloc
+
+* Allocators own memory; buffers are views
+* Disposal is a lifetime boundary
+* Thread safety is allocator-specific
+* Allocation strategy is a design decision, not an optimization toggle
+
+---
+
+## Specialized Allocators
 
 ### NumaAwareAllocator
-**NUMA-aware memory allocation** for multi-socket systems with **20-40% performance improvements**:
+
+NUMA-aware memory allocation for multi-socket systems.
 
 ```csharp
-// Automatic NUMA node detection and optimization
 using var numaAllocator = Z.CreateNumaAwareAllocator();
 using var buffer = numaAllocator.Allocate<int>(1000);
 
 // Memory allocated on same NUMA node as requesting thread
-// Get performance statistics
 var stats = numaAllocator.GetNodeStatistics();
 ```
 
-**Key Benefits:**
-- **20-40% Performance Improvement** on multi-socket NUMA systems
-- **Reduced Memory Latency** through node-local allocation
-- **Better Scalability** for multi-threaded applications
-- **Automatic Detection** works on Windows, Linux, and macOS
+Supports Windows, Linux, and macOS.
 
 ### AlignedAllocator
-**Hardware-accelerated memory alignment** with **10-30% faster SIMD operations**:
+
+Memory alignment for SIMD operations.
 
 ```csharp
-// Automatic alignment optimization for hardware acceleration
 using var alignedAllocator = Z.CreateAlignedAllocator();
 using var buffer = alignedAllocator.Allocate<Vector128<float>>(1000);
 
-// Get alignment statistics and performance metrics
 var stats = alignedAllocator.GetAlignmentStatistics();
 Console.WriteLine($"Alignment efficiency: {stats.AlignmentEfficiency:F1}%");
 ```
 
-**Key Benefits:**
-- **10-30% Faster SIMD Operations** through optimal alignment
-- **Better Cache Utilization** with cache-line alignment
-- **Hardware Detection** for SSE, AVX, AVX-512, ARM NEON
-- **Multiple Strategies** (Auto, CacheLine, SSE, AVX, AVX512, Custom)
+Supports SSE, AVX, AVX-512, ARM NEON with multiple alignment strategies.
 
-## 🚀 Quick Start
+---
+
+## Quick Start
 
 ```csharp
 using ZiggyAlloc;
@@ -82,63 +98,36 @@ Span<int> span = buffer;
 span.Fill(123);
 ```
 
-## 📊 Performance Comparison
+---
 
-ZiggyAlloc delivers exceptional performance through multiple optimization strategies:
+## Performance Notes
 
-### SIMD Memory Operations (Latest Results)
+ZiggyAlloc avoids GC pressure and can reduce allocation overhead in specific workloads.
+Detailed benchmarks are available in `docs/performance.md`.
 
-**Revolutionary Performance Gains with Hardware Acceleration:**
+Performance varies by hardware and access pattern.
 
-| Operation | Data Size | Standard | SIMD Accelerated | Performance Gain | Hardware |
-|-----------|-----------|----------|------------------|------------------|----------|
-| **ZeroMemory** | 1KB | 330ns | 21ns | **15.7x faster** | AVX2 |
-| **ZeroMemory** | 16KB | 5.07μs | 190ns | **26.7x faster** | AVX2 |
-| **ZeroMemory** | 64KB | 45.46μs | 1.57μs | **28.9x faster** | AVX2 |
-| **CopyMemory** | 1KB | 393ns | 54ns | **7.3x faster** | AVX2 |
-| **CopyMemory** | 16KB | 6.09μs | 773ns | **7.9x faster** | AVX2 |
-| **CopyMemory** | 64KB | 61.45μs | 11.04μs | **5.6x faster** | AVX2 |
+---
 
-**Advanced Performance Optimizations:**
-- **20-55% faster allocation** through `Unsafe.SizeOf<T>()` and optimized calculations
-- **35-55% faster pool operations** with SpinLock optimization and size-class arrays
-- **10-20% improvement** in span operations using `MemoryMarshal`
-- **25-40% overall system improvement** across allocation patterns
+## Allocator Selection
 
-### Traditional Allocator Performance
+| Allocator             | Use When                     | Thread Safe | Notes                          |
+| --------------------- | ---------------------------- | ----------- | ------------------------------ |
+| SystemMemoryAllocator | General unmanaged use        | Yes         | Wraps OS allocation            |
+| ScopedAllocator       | Temporary phases             | No          | Frees on dispose               |
+| SlabAllocator         | Many small fixed allocations | Yes         | Size-class based               |
+| UnmanagedMemoryPool   | Frequent reuse               | Yes         | Reduces OS calls               |
+| DebugAllocator        | Development                  | Yes         | Tracks leaks                   |
+| HybridAllocator       | Mixed workloads              | Yes         | Chooses strategy automatically |
+| LargeBlockAllocator   | Large allocations (>64KB)    | Yes         | Memory pooling                 |
+| NumaAwareAllocator    | Multi-socket systems         | Yes         | Hardware dependent             |
+| AlignedAllocator      | SIMD-heavy workloads         | Yes         | Hardware dependent             |
 
-| Data Type | Managed Array | Unmanaged Array | Performance Gain | GC Pressure |
-|-----------|---------------|-----------------|------------------|-------------|
-| `byte`    | 5.85μs        | 6.01μs          | ~1.03x           | High        |
-| `int`     | 5.65μs        | 8.71μs          | ~1.54x           | High        |
-| `double`  | 9.40μs        | 5.66μs          | ~1.66x           | High        |
-| `Point3D` | 9.85μs        | 6.13μs          | ~1.61x           | High        |
+> Thread safety may involve internal locking and has a performance cost.
 
-> **Performance Insights**:
-> - **SIMD Operations**: 5-29x performance improvement for memory clearing and copying
-> - **Large Data Types**: 40%+ performance improvement with unmanaged arrays
-> - **GC Pressure**: Eliminated completely with unmanaged allocations
-> - **Hardware Acceleration**: AVX2 support with automatic fallback for older hardware
+---
 
-## 🔧 Allocator Comparison
-
-Different allocators for different use cases:
-
-| Allocator | Best For | Thread Safety | GC Pressure | Performance |
-|-----------|----------|---------------|-------------|-------------|
-| **SystemMemoryAllocator** | General purpose | ✅ Safe | ❌ None | ⚡ High |
-| **ScopedAllocator** | Temporary allocations | ❌ Not safe | ❌ None | ⚡⚡ Very High |
-| **DebugAllocator** | Development/testing | ✅ Safe | ❌ None | ⚡ Medium |
-| **UnmanagedMemoryPool** | Frequent allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
-| **HybridAllocator** | Mixed workloads | ✅ Safe | ⚡ Adaptive | ⚡⚡ Very High |
-| **SlabAllocator** | High-frequency small allocations | ✅ Safe | ❌ None | ⚡⚡ Very High |
-| **LargeBlockAllocator** | Large allocations (>64KB) | ✅ Safe | ❌ None | ⚡⚡ Very High |
-| **NumaAwareAllocator** | Multi-socket systems | ✅ Safe | ❌ None | ⚡⚡ Very High* |
-| **AlignedAllocator** | SIMD-heavy workloads | ✅ Safe | ❌ None | ⚡⚡ Very High* |
-
-> *Performance varies by hardware: **NumaAwareAllocator** shows 20-40% improvement on NUMA systems, **AlignedAllocator** provides 10-30% improvement for SIMD operations
-
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```mermaid
 graph TD
@@ -158,15 +147,17 @@ graph TD
     E --> B
     F --> B
     G --> B
-    
-    I[UnmanagedBuffer&lt;T&gt;] --> J[Bounds Checking]
-    I --> K[Automatic Cleanup]
-    I --> L[Span&lt;T&gt; Integration]
+
+    U[UnmanagedBuffer<T>] --> J[Bounds Checking]
+    U --> K[Automatic Cleanup]
+    U --> L[Span<T> Integration]
 ```
 
-## 🧠 Core Concepts
+---
 
-### UnmanagedBuffer&lt;T&gt;
+## Core Concepts
+
+### UnmanagedBuffer<T>
 
 The core type for working with unmanaged memory:
 
@@ -183,26 +174,33 @@ Span<int> span = buffer;
 span.Fill(123);
 ```
 
+---
+
 ### Multiple Allocator Strategies
 
 #### SystemMemoryAllocator
+
 Direct system memory allocation with tracking.
 
 #### ScopedAllocator
+
 Arena-style allocator that frees all memory when disposed.
 
 #### DebugAllocator
+
 Tracks allocations and detects memory leaks with caller information.
 
 #### UnmanagedMemoryPool
+
 Reduces allocation overhead by reusing previously allocated buffers.
 
 #### HybridAllocator
+
 Automatically chooses between managed and unmanaged allocation based on size and type for optimal performance.
 
 #### SlabAllocator
 
-A slab allocator that pre-allocates large blocks of memory and sub-allocates from them. This allocator is particularly efficient for scenarios with many small, similarly-sized allocations.
+A slab allocator that pre-allocates large blocks of memory and sub-allocates from them.
 
 ```csharp
 var systemAllocator = new SystemMemoryAllocator();
@@ -215,20 +213,21 @@ using var smallBuffer = slabAllocator.Allocate<int>(100);
 using var largeBuffer = slabAllocator.Allocate<int>(10000);
 ```
 
-**Key Benefits:**
-- Extremely fast allocation/deallocation for small objects
-- Zero fragmentation within slabs
-- Reduced system call overhead
-- Better cache locality
+Characteristics:
 
-**Use Cases:**
-- High-frequency small allocations of similar sizes
-- Performance-critical code paths
-- Scenarios where allocation patterns are predictable
+* Fast allocation for small objects
+* No internal fragmentation
+* Good cache locality
+
+Use cases:
+
+* High-frequency small allocations of similar sizes
+* Performance-critical code paths
+* Scenarios where allocation patterns are predictable
 
 #### LargeBlockAllocator
 
-A specialized allocator optimized for large memory blocks (>64KB) with memory pooling and alignment optimization.
+Optimized for large memory blocks (>64KB) with pooling and alignment.
 
 ```csharp
 var systemAllocator = new SystemMemoryAllocator();
@@ -241,183 +240,91 @@ using var largeBuffer = largeBlockAllocator.Allocate<byte>(1024 * 1024); // 1MB
 using var anotherBuffer = largeBlockAllocator.Allocate<byte>(1024 * 1024); // Reuses pooled memory
 ```
 
-**Key Benefits:**
-- **Memory Pooling**: Reduces allocation overhead for large blocks
-- **4KB Alignment**: Optimal memory alignment for performance
-- **SIMD Integration**: Uses hardware-accelerated memory operations
-- **Size-Class Optimization**: Different pools for different block sizes
+Characteristics:
 
-**Use Cases:**
-- Large data processing (images, scientific data, etc.)
-- High-performance computing scenarios
-- Applications with predictable large allocation patterns
+* Memory pooling for large blocks
+* 4KB alignment for performance
+* SIMD integration
+* Size-class optimization
 
-## 🚀 Advanced Features
+Use cases:
 
-### SIMD Memory Operations
+* Large data processing (images, scientific data, etc.)
+* High-performance computing scenarios
+* Applications with predictable large allocation patterns
 
-Hardware-accelerated memory operations with revolutionary performance gains:
+---
 
-```csharp
-using ZiggyAlloc;
+## Examples
 
-// SIMD operations are automatically used by allocators
-var allocator = new SystemMemoryAllocator();
-
-// Large allocations automatically benefit from SIMD acceleration
-using var largeBuffer = allocator.Allocate<byte>(65536);
-
-// Memory clearing is 29x faster with AVX2 acceleration
-largeBuffer.Clear(); // Uses SimdMemoryOperations.ZeroMemory internally
-
-// Memory copying is 5-8x faster
-using var destBuffer = allocator.Allocate<byte>(65536);
-largeBuffer.CopyTo(destBuffer); // Uses SimdMemoryOperations.CopyMemory
-```
-
-**Key Benefits:**
-- **5-29x Performance Improvement**: Hardware-accelerated memory operations
-- **AVX2 Support**: Uses latest CPU instructions when available
-- **Automatic Fallback**: Graceful degradation for older hardware
-- **Zero Configuration**: Works out-of-the-box with all allocators
-
-### Memory Pooling
-
-Reduce allocation overhead by reusing buffers:
-
-```csharp
-var systemAllocator = new SystemMemoryAllocator();
-using var pool = new UnmanagedMemoryPool(systemAllocator);
-
-// First allocation - creates new buffer
-using var buffer1 = pool.Allocate<int>(100);
-
-// Second allocation - reuses buffer from pool if available
-using var buffer2 = pool.Allocate<int>(100);
-
-// Buffers are returned to the pool when disposed
-```
-
-### Hybrid Allocation
-
-Intelligent allocation strategy selection:
-
-```csharp
-var systemAllocator = new SystemMemoryAllocator();
-using var hybridAllocator = new HybridAllocator(systemAllocator);
-
-// Small allocations may use managed arrays for better performance
-using var smallBuffer = hybridAllocator.Allocate<int>(100);
-
-// Large allocations will use unmanaged memory to avoid GC pressure
-using var largeBuffer = hybridAllocator.Allocate<int>(10000);
-```
-
-## 📈 Performance Benchmarks
-
-Comprehensive benchmarks demonstrate exceptional performance across multiple optimization strategies:
-
-### SIMD Memory Operations (Latest)
-- **5-29x Performance Improvement**: Hardware-accelerated memory operations using AVX2
-- **ZeroMemory Operations**: 15-29x faster than standard implementations
-- **CopyMemory Operations**: 5-8x faster than standard implementations
-- **Hardware Detection**: Automatic AVX2/SIMD/fallback selection based on CPU capabilities
-
-### Traditional Optimizations
-- **Large Data Types**: 40%+ performance improvement with unmanaged arrays
-- **GC Pressure**: Eliminated completely with unmanaged allocations
-- **Memory Pooling**: Reduces allocation overhead by reusing buffers
-- **Hybrid Allocation**: Uses managed arrays for small allocations (faster) and unmanaged memory for large allocations (no GC pressure)
-- **Lock-Free Operations**: SpinLock optimization for better contention handling
-
-### Memory Pooling Benefits
-
-```csharp
-// Without pooling - each allocation calls into the OS
-var allocator = new SystemMemoryAllocator();
-for (int i = 0; i < 1000; i++)
-{
-    using var buffer = allocator.Allocate<byte>(1024); // System call each time
-    // Process buffer...
-}
-
-// With pooling - first allocation per size calls OS, subsequent allocations reuse
-using var pool = new UnmanagedMemoryPool(allocator);
-for (int i = 0; i < 1000; i++)
-{
-    using var buffer = pool.Allocate<byte>(1024); // Reuses pooled buffer
-    // Process buffer...
-}
-```
-
-### Hybrid Allocator Thresholds
-
-| Data Type | Managed Allocation | Unmanaged Allocation |
-|-----------|-------------------|---------------------|
-| `byte[]`  | ≤ 1,024 elements   | > 1,024 elements     |
-| `int[]`   | ≤ 512 elements     | > 512 elements      |
-| `double[]`| ≤ 128 elements     | > 128 elements      |
-| `structs` | ≤ 64 elements      | > 64 elements       |
-
-## 📚 Examples
-
-The [examples](examples/) directory contains organized examples demonstrating various use cases:
+The [examples](examples/) directory contains organized examples:
 
 ### Basic Usage
-- Simple memory allocation and automatic cleanup
-- Using `using` statements for RAII-style memory management
+
+* Simple memory allocation and automatic cleanup
+* Using `using` statements for RAII-style memory management
 
 ### Advanced Features
-- Different allocator types and their use cases
-- Memory leak detection
-- High-performance buffer operations
-- Native interop scenarios
+
+* Different allocator types and their use cases
+* Memory leak detection
+* High-performance buffer operations
+* Native interop scenarios
 
 ### Performance Optimization
-- Memory pooling for frequent allocations
-- Hybrid allocation strategies
-- Avoiding GC pressure with large allocations
+
+* Memory pooling for frequent allocations
+* Hybrid allocation strategies
+* Avoiding GC pressure with large allocations
 
 ### Real-World Applications
-- Image processing without GC pressure
-- Scientific computing with large datasets
-- Native API interop
+
+* Image processing without GC pressure
+* Scientific computing with large datasets
+* Native API interop
 
 To run examples:
+
 ```bash
 cd examples
 dotnet run -- basic
 dotnet run -- allocators
-dotnet run -- performance
 dotnet run -- realworld
 ```
 
-## 📦 Installation
+---
 
-Install the NuGet package:
+## Installation
 
 ```bash
 dotnet add package ZiggyAlloc
 ```
 
-Or add to your `.csproj`:
+Or in your `.csproj`:
 
 ```xml
 <PackageReference Include="ZiggyAlloc" Version="1.3.0" />
 ```
 
-## 📖 Documentation
+---
 
-- [Getting Started Guide](GETTING_STARTED.md)
-- [Full API Documentation](DOCUMENTATION.md)
-- [Examples](examples/README.md)
-- [Benchmarks](benchmarks/README.md)
+## Documentation
 
-## 🛠️ Requirements
+* [Getting Started Guide](GETTING_STARTED.md)
+* [Full API Documentation](DOCUMENTATION.md)
+* [Examples](examples/README.md)
+* [Performance Benchmarks](docs/performance.md)
 
-- .NET 8.0 or later
-- `unsafe` code enabled (configured in package)
+---
 
-## 📃 License
+## Requirements
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+* .NET 8.0 or later
+* `unsafe` code enabled (configured in package)
+
+---
+
+## License
+
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+
