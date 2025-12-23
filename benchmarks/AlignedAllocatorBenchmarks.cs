@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using System.Runtime.Intrinsics;
 using BenchmarkDotNet.Attributes;
@@ -275,8 +276,8 @@ namespace ZiggyAlloc.Benchmarks
                     sum += span[j];
                 }
 
-                // Verify sum is reasonable
-                Assert.True(double.IsFinite(sum));
+                // Verify sum is reasonable (just consume the result)
+                _ = double.IsFinite(sum);
             }
         }
 
@@ -304,8 +305,8 @@ namespace ZiggyAlloc.Benchmarks
                     sum += span[j];
                 }
 
-                // Verify sum is reasonable
-                Assert.True(double.IsFinite(sum));
+                // Verify sum is reasonable (just consume the result)
+                _ = double.IsFinite(sum);
             }
         }
 

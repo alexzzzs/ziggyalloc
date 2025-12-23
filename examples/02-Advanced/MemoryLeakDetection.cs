@@ -4,7 +4,7 @@ using ZiggyAlloc;
 namespace ZiggyAlloc.Examples.Advanced
 {
     /// <summary>
-    /// Advanced example demonstrating memory leak detection with DebugMemoryAllocator.
+    /// Advanced example demonstrating memory leak detection with DebugAllocator.
     /// </summary>
     public class MemoryLeakDetection
     {
@@ -13,7 +13,7 @@ namespace ZiggyAlloc.Examples.Advanced
             Console.WriteLine("=== Memory Leak Detection Example ===\n");
 
             // Create a debug allocator that will throw exceptions on leaks
-            using var debugAllocator = new DebugMemoryAllocator(
+            using var debugAllocator = new DebugAllocator(
                 "LeakDetectionDemo", 
                 Z.DefaultAllocator, 
                 MemoryLeakReportingMode.Throw);

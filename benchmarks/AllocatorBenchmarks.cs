@@ -42,7 +42,7 @@ namespace ZiggyAlloc.Benchmarks
         {
             for (int i = 0; i < Iterations; i++)
             {
-                using var scopedAllocator = new ScopedMemoryAllocator();
+                using var scopedAllocator = new ScopedAllocator();
                 var buffer = scopedAllocator.Allocate<int>(AllocationSize);
                 // No explicit free needed - will be freed when scoped allocator is disposed
             }
@@ -51,7 +51,7 @@ namespace ZiggyAlloc.Benchmarks
         [Benchmark]
         public void ScopedAllocator_MultipleAllocations()
         {
-            using var scopedAllocator = new ScopedMemoryAllocator();
+            using var scopedAllocator = new ScopedAllocator();
             for (int i = 0; i < Iterations; i++)
             {
                 var buffer = scopedAllocator.Allocate<int>(AllocationSize);

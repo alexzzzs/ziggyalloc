@@ -21,7 +21,7 @@ namespace ZiggyAlloc.Benchmarks
         private const int LargeBufferSize = 8192;
 
         private SystemMemoryAllocator _systemAllocator = null!;
-        private ScopedMemoryAllocator _scopedAllocator = null!;
+        private ScopedAllocator _scopedAllocator = null!;
         private UnmanagedMemoryPool _memoryPool = null!;
         private HybridAllocator _hybridAllocator = null!;
         private SlabAllocator _slabAllocator = null!;
@@ -30,7 +30,7 @@ namespace ZiggyAlloc.Benchmarks
         public void Setup()
         {
             _systemAllocator = new SystemMemoryAllocator();
-            _scopedAllocator = new ScopedMemoryAllocator();
+            _scopedAllocator = new ScopedAllocator();
             _memoryPool = new UnmanagedMemoryPool(_systemAllocator);
             _hybridAllocator = new HybridAllocator(_systemAllocator);
             _slabAllocator = new SlabAllocator(_systemAllocator);
@@ -191,7 +191,7 @@ namespace ZiggyAlloc.Benchmarks
             // Scoped allocator is not thread-safe, so we test serial performance
             for (int i = 0; i < ParallelTaskCount; i++)
             {
-                using var scope = new ScopedMemoryAllocator();
+                using var scope = new ScopedAllocator();
                 for (int j = 0; j < AllocationsPerTask; j++)
                 {
                     using var buffer = scope.Allocate<byte>(SmallBufferSize);
